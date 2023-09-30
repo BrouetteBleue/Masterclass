@@ -17,8 +17,8 @@ app.get('/convert', (req, res) => {
       const realUrl = data.url;
       // Téléchargez le fichier à partir de realUrl
       
-      const outputFilename = `${title}.mp4`;
-    const cmd = `ffmpeg -i "${realUrl}" -c copy ${outputFilename}`;
+      const outputFilename = `${title}.mp3`;
+    const cmd = `ffmpeg -i "${realUrl}" -q:a 0 -map a ${outputFilename}`;
   
     exec(cmd, (error, stdout, stderr) => {
       if (error) {
@@ -32,7 +32,7 @@ app.get('/convert', (req, res) => {
     }); 
 
    
-  });
+  }); 
 
 app.listen(3000, () => {
   console.log('Serveur en écoute sur le port 3000.');
