@@ -12,6 +12,7 @@ export default function App() {
   const [textInputValue, setTextInputValue] = useState('');
   const webViewRef = useRef(null);
   const [prevUrl, setPrevUrl] = useState('');
+  const [isMessageProcessing, setIsMessageProcessing] = useState(false);
 
 
   const handleButtonPress = () => {
@@ -19,64 +20,67 @@ export default function App() {
   };
 
   const debouncedOnMessage = debounce((data) => {
-
+    if (isMessageProcessing) {
+      console.log('Message ignoré :', data);
+      return;
+    }
+    setIsMessageProcessing(true);
     console.log('Message reçu :', data);
 
-    if (data.action == 'play' || data.action == 'load') {
+    // if (data.action == 'play' || data.action == 'load') {
       Alert.alert('Vidéo détectée', 'Voulez-vous télécharger cette vidéo?', [
         { text: 'Oui', onPress: () => {
 
           console.log('Téléchargement en cours...');
-      
-
-      const cleanFileName = (fileName) => {
-        return fileName.replace(/[^a-zA-Z0-9]/g, '_');
-      }
-
-      const downloadFile = async () => {
-
-        if(uri.includes('soundcloud')){
-          const cleanedTitle = cleanFileName(data.title);
-          const url = `http://192.168.1.34:3000/convert?url=${encodeURIComponent(data.url)}&title=${cleanedTitle}`;
-          const fileUri = `${FileSystem.documentDirectory}/${cleanedTitle}.mp3`;
-        
-          const response = await fetch(url);
-          const blob = await response.blob();
-          
-          const reader = new FileReader();
-          reader.onload = async function() {
-            const base64data = reader.result.split(',')[1];
-            await FileSystem.writeAsStringAsync(fileUri, base64data, {
-              encoding: FileSystem.EncodingType.Base64,
-            });
-          };
-          reader.readAsDataURL(blob);
-          console.log(`Fichier téléchargé et sauvegardé à ${fileUri}`);
-        }
-        else{
-            const url = data.url;
-            const cleanedTitle = cleanFileName(data.title);
-            const fileUrl = FileSystem.documentDirectory + `/${cleanedTitle}.mp4`;
-              
-            const download = FileSystem.createDownloadResumable(url,fileUrl);
-          
-            const { url: downloadedUrl } = await download.downloadAsync();
-            console.log(`Fichier téléchargé et sauvegardé à ${downloadedUrl}`);
-
-            // convertMedia(downloadedUrl);
-        }
-       
-          
-      };
-
-          downloadFile();
-
+    
+          const cleanFileName = (fileName) => {
+            return fileName.replace(/[^a-zA-Z0-9]/g, '_');
           }
-          
-        },
-        { text: 'Non', onPress: () => console.log('Téléchargement annulé.') },
+
+          const downloadFile = async () => {
+
+            if(uri.includes('soundcloud')){
+              const cleanedTitle = cleanFileName(data.title);
+              const url = `http://192.168.1.34:3000/convert?url=${encodeURIComponent(data.url)}&title=${cleanedTitle}`;
+              const fileUri = `${FileSystem.documentDirectory}/${cleanedTitle}.mp3`;
+            
+              const response = await fetch(url);
+              const blob = await response.blob();
+              
+              const reader = new FileReader();
+              reader.onload = async function() {
+                const base64data = reader.result.split(',')[1];
+                await FileSystem.writeAsStringAsync(fileUri, base64data, {
+                  encoding: FileSystem.EncodingType.Base64,
+                });
+              };
+              reader.readAsDataURL(blob);
+              console.log(`Fichier téléchargé et sauvegardé à ${fileUri}`);
+              setIsMessageProcessing(false);
+            }
+            else{
+                const url = data.url;
+                const cleanedTitle = cleanFileName(data.title);
+                const fileUrl = FileSystem.documentDirectory + `/${cleanedTitle}.mp4`;
+                  
+                const download = FileSystem.createDownloadResumable(url,fileUrl);
+              
+                const { url: downloadedUrl } = await download.downloadAsync();
+                console.log(`Fichier téléchargé et sauvegardé à ${downloadedUrl}`);
+                setIsMessageProcessing(false);
+                // convertMedia(downloadedUrl);
+            }        
+          };
+          downloadFile();
+        }    
+      },
+      { text: 'Non', onPress: () => {
+          console.log('Téléchargement annulé.');
+          setIsMessageProcessing(false);
+        } 
+      }
       ]);
-    }
+    // }
   }, 500); // Attend 500ms avant d'exécuter
 
   const onMessageHandler = (event) => {
@@ -87,12 +91,12 @@ export default function App() {
   let currentUrl = '';
   let lastHlsUrl = ''; // Stocke la dernière URL HLS
   let currentTitle = '';
-let isMusicAlreadyPlayed = false;
+  let isMusicAlreadyPlayed = false;
   
   const runFirst = `
   (function() {
-   let hlsUrls = [];// tableau pour stocker les urls car a chaque navigation elles restent en mémoire et le code récupère la première url qu'il trouve, donc on stocke les urls dans un tableau et on récupère la dernière
-   isMusicAlreadyPlayed = false;
+   let hlsUrls = []; // tableau pour stocker les urls car a chaque navigation elles restent en mémoire et le code récupère la première url qu'il trouve, donc on stocke les urls dans un tableau et on récupère la dernière
+   isMusicAlreadyPlayed = false; // variable pour savoir si la musique a déjà été jouée pour activer le click sur le bouton play
    
      
 // Fonction pour envoyer des données
@@ -100,23 +104,27 @@ let isMusicAlreadyPlayed = false;
       const data = { "action" : action, "url" : url, "title" : title }; // l'objet a renvoyer
       window.ReactNativeWebView.postMessage(JSON.stringify(data)); // on envoie l'objet en string (la fonction reçoit une string)
     }
-  function checkAndSendData(action) {
-    // isNewMusicLoaded = true;
-    if (lastHlsUrl && currentTitle) {
 
-      if(currentTitle !== getTitleElement().innerText){
+  function checkAndSendData(action) {
+    if (lastHlsUrl && currentTitle) { // si on a la derniere url et le titre
+
+      // une dernière vérification pour être sur que le titre est bien le bon
+      if(currentTitle !== getTitleElement().innerText){ 
         currentTitle = getTitleElement().innerText;
       }
 
-      window.ReactNativeWebView.postMessage("Action :"+ action +"Dernière URL HLS"+currentUrl + "AAAAAAAAAAAAAAAAAAAAA"+ currentTitle);
-        lastHlsUrl = '';  // Réinitialisez pour le prochain
-      //  currentTitle = ''; // Réinitialisez pour le prochain
+      // window.ReactNativeWebView.postMessage("Action :"+ action +"Dernière URL HLS"+currentUrl + "AAAAAAAAAAAAAAAAAAAAA"+ currentTitle);
+
+      sendData(action, lastHlsUrl, currentTitle); // on envoie les données
+      lastHlsUrl = '';  // Réinitialisez l'url pour le prochain son (pour éviter de renvoyer la même url)
       isMusicAlreadyPlayed = true;
     }
 
-    else if (action == "click bouton play" && isMusicAlreadyPlayed) {
+    // le click sur le bouton play est détecté mais la musique a déjà été jouée
+    else if (action == "click bouton play" && isMusicAlreadyPlayed) { 
       // Envoyez des données seulement si la musique a déjà été jouée
-      window.ReactNativeWebView.postMessage("Action :"+ action +"Dernière URL HLS"+currentUrl + "AAAAAAAAAAAAAAAAAAAAA"+ currentTitle);
+      // window.ReactNativeWebView.postMessage("Action :"+ action +"Dernière URL HLS"+currentUrl + "AAAAAAAAAAAAAAAAAAAAA"+ currentTitle);
+      sendData(action, currentUrl, currentTitle);
     }
   }
 
@@ -154,22 +162,22 @@ let isMusicAlreadyPlayed = false;
             const node = mutation.addedNodes[i]; // on recupere le noeud
             if (node.querySelector && (node.querySelector('[class*="soundTitle__title"] span') || node.querySelector('.PlayableHeader_Title__DndQM'))) { // si le noeud contient le titre
               // Le titre a été ajouté, envoyer les données.
-              // sendData('load', lastHlsUrl, getTitleElement().innerText);
+              
               currentTitle = getTitleElement().innerText; // avant cette ligne le titre est vide
-              // window.ReactNativeWebView.postMessage("le Titre 2"+lastHlsUrl);
-              isMusicAlreadyPlayed = false;
+              // sendData('load', lastHlsUrl, getTitleElement().innerText);
+
+              isMusicAlreadyPlayed = false; // ce code se trigger au chargement de la page donc le son n'est pas encore joué
               setTimeout(() => {
                 checkAndSendData("title obserever");
                 isMusicAlreadyPlayed = true;
               }, 2000);
-              // currentUrl = '';
             }
           }
         }
       });
     });
 
-    let buttonHandlers = {};
+    let buttonHandlers = {}; // stocke les id des évènements du bouton play et pause pour pouvoir les supprimer et les réajouter à chaque changement de page
     
     // Fonction pour attacher un écouteur d'événement click aux boutons de contrôle
     function attachClickListenerToControlButtons() {
@@ -177,7 +185,7 @@ let isMusicAlreadyPlayed = false;
       buttons.forEach((button, index) => {  // pr chaque bouton de controle
 
         if (buttonHandlers[index]) {
-          button.removeEventListener('click', buttonHandlers[index]);
+          button.removeEventListener('click', buttonHandlers[index]); // supprime l'event listener du bouton si il existe
         }
 
            buttonHandlers[index] = function() {
@@ -185,14 +193,12 @@ let isMusicAlreadyPlayed = false;
               if (svgElement && svgElement.classList.contains('ControlButton_PlayButtonIcon__2BcGf')) { // si le svg contient la classe play
                   const titleElement = getTitleElement();
                 // sendData('play', lastHlsUrl, titleElement ? titleElement.innerText : ''); // le titre peut etre dans une balise span en fonction de la plateforme 
-                //  window.ReactNativeWebView.postMessage("Dernière URL HLS"+currentUrl);
-                // if (isNewMusicLoaded) {
+
                   setTimeout(() => {
                     checkAndSendData("click bouton play");
                   }, 2000);
-                // }
               }
-              // if (svgElement && svgElement.classList.contains('ControlButton_PauseButtonIcon__1uSsq')) { 
+              // if (svgElement && svgElement.classList.contains('ControlButton_PauseButtonIcon__1uSsq')) {   // code pour le bouton pause
               //   isNewMusicLoaded = true;
               // }
             }
@@ -202,7 +208,7 @@ let isMusicAlreadyPlayed = false;
     }
     
     window.addEventListener('hashchange', function() {
-      isMusicAlreadyPlayed = false; // Réinitialisez la variable lors de la navigation
+      isMusicAlreadyPlayed = false; // Réinitialise la variable lors de la navigation
     });
   
     // Initier l'observation du titre
@@ -306,8 +312,8 @@ let isMusicAlreadyPlayed = false;
         source={{ uri }}
         style={{ flex: 5, backgroundColor: 'green' }}
         injectedJavaScript={runFirst}
-        // onMessage={onMessageHandler}
-        onMessage={onDebugMessageHandler}
+        onMessage={onMessageHandler}
+        // onMessage={onDebugMessageHandler}
         onNavigationStateChange={handleNavigationStateChange}
         originWhitelist={['*']}
         // userAgent="Mozilla/5.0 (Linux; Android 10; SM-A205U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.3"
