@@ -13,12 +13,17 @@ app.get('/convert', (req, res) => {
     fetch(url)
     .then(response => response.json())
     .then(data => {
+      // console.log(data);
       
       const realUrl = data.url;
       // Téléchargez le fichier à partir de realUrl
+
+      // console.log('realUrl :'+realUrl);
       
       const outputFilename = `${title}.mp3`;
     const cmd = `ffmpeg -i "${realUrl}" -q:a 0 -map a ${outputFilename}`;
+
+    // console.log(`Exécution de la commande: ${cmd}`);
   
     exec(cmd, (error, stdout, stderr) => {
       if (error) {

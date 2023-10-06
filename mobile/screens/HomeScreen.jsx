@@ -1,11 +1,16 @@
-import { StyleSheet, Text, View, Pressable, TextInput, Button, Alert, FlatList, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, Pressable, ScrollView, TextInput, Button, Alert, FlatList, SafeAreaView } from 'react-native';
 import React, { useState, useEffect, useRef } from 'react';
 import { Video , Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
+import * as SQLite from 'expo-sqlite';
+import FileThumbnail from '../components/FileThumnail';
 
 export default function  PromotionsScreen() {
-	const [mediaFiles, setMediaFiles] = useState([]);
+	  const [mediaFiles, setMediaFiles] = useState([]);
     const [sound, setSound] = useState(null);
+    const [data, setData] = useState([]);
+  
+
 
     useEffect(() => {
       const fetchFiles = async () => {
@@ -15,12 +20,31 @@ export default function  PromotionsScreen() {
       };
 
       fetchFiles();
+
+
+      const db = SQLite.openDatabase('files.db');
+
+      db.transaction(tx => {
+        tx.executeSql("SELECT * FROM files WHERE extension = 'mp4';", [], (tx, results) => {
+          // const len = results.rows.length;
+          // for (let i = 0; i < len; i++) {
+          //   let row = results.rows.item(i);
+          //   console.log(row);
+
+          // }
+          console.log(results.rows._array);
+          setData(results.rows._array);
+
+        });
+      });
+      
     }, []);
 
     const playSound = async (uri) => {
       if (sound) {
         await sound.unloadAsync();
       }
+      console.log(uri);
       const { sound: newSound } = await Audio.Sound.createAsync({ uri });
       setSound(newSound);
       await newSound.playAsync();
@@ -28,30 +52,27 @@ export default function  PromotionsScreen() {
   
     return (
         <SafeAreaView>
-            <View>
-                <FlatList
-                data={mediaFiles}
-                keyExtractor={(item) => item}
-                renderItem={({ item }) => (
-                    <View>
-                    <Text>{item}</Text>
-                    {item.endsWith('.mp3') ? (
-                        <Button title="Play Audio" onPress={() => playSound(`${FileSystem.documentDirectory}${item}`)} />
-                    ) : (
-                        <Video
-                        source={{ uri: `${FileSystem.documentDirectory}${item}` }}
-                        rate={1.0}
-                        volume={1.0}
-                        isMuted={false}
-                        resizeMode="cover"
-                        shouldPlay={false}
-                        style={{ width: 300, height: 300 }}
-                        />
-                    )}
-                    </View>
-                )}
-                />
-            </View>
+            <ScrollView>
+              <View style={styles.container} >
+              {data.map((item) => (
+                <>
+                <FileThumbnail key={item.id} data={item} />
+                </>
+              ))}
+              </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
+const styles = StyleSheet.create({
+        container: {
+          backgroundColor: '#fff',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          padding: 10,
+          width: '100%',
+
+        },
+      });

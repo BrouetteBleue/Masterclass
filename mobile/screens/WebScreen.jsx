@@ -4,15 +4,67 @@ import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput, Button, Ale
 import { WebView } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system';
 import { Video , Audio } from 'expo-av';
+import * as SQLite from 'expo-sqlite';
 import { debounce } from 'lodash';
 
 
 export default function WebScreen() {
-  const [uri, setUri] = useState('https://m.soundcloud.com/');
+  const [uri, setUri] = useState('https://m.youtube.com/');
   const [textInputValue, setTextInputValue] = useState('');
   const webViewRef = useRef(null);
   const [prevUrl, setPrevUrl] = useState('');
   const [isMessageProcessing, setIsMessageProcessing] = useState(false);
+
+  useEffect(() => {
+    const db = SQLite.openDatabase('files.db');
+
+    db.transaction(tx => {
+      tx.executeSql(
+        "CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, url TEXT, date DATE, duration TEXT, size TEXT, extension TEXT);"
+      );
+      console.log('Table created');
+    });
+  }, []);
+
+
+  const convertMedia = async (uri, name) => {
+    try {
+      console.log("URI:", uri);
+      const extension = uri.split('.').pop();
+      console.log("Extension:", extension);
+      let duration = 0;
+  
+        console.log("Création du son...");
+        const { sound: newSound } = await Audio.Sound.createAsync({ uri });
+        console.log("Son créé");
+        const { durationMillis } = await newSound.getStatusAsync();
+        duration = durationMillis / 1000;
+        console.log("Durée du son:", duration);
+
+      
+      console.log("Obtention des informations du fichier...");
+      const size = await FileSystem.getInfoAsync(uri, { size: true });
+      const date = new Date().toISOString().split('T')[0];
+    
+      console.log("Ouverture de la base de données...");
+      const db = SQLite.openDatabase('files.db');
+    
+      db.transaction(tx => {
+        tx.executeSql(
+          "INSERT INTO files (name, url, date, size, extension) VALUES (?, ?, ?, ?, ?);",
+          [name, uri, date, size.size, extension]
+        );
+        console.log('File inserted');
+      });
+    } catch (error) {
+      console.error("Erreur :", error);
+    }
+  };
+
+
+
+
+
 
 
   const handleButtonPress = () => {
@@ -42,7 +94,7 @@ export default function WebScreen() {
             if(uri.includes('soundcloud')){
               const cleanedTitle = cleanFileName(data.title);
               const url = `http://192.168.1.34:3000/convert?url=${encodeURIComponent(data.url)}&title=${cleanedTitle}`;
-              const fileUri = `${FileSystem.documentDirectory}/${cleanedTitle}.mp3`;
+              const fileUri = `${FileSystem.documentDirectory}${cleanedTitle}.mp3`;
             
               const response = await fetch(url);
               const blob = await response.blob();
@@ -53,23 +105,32 @@ export default function WebScreen() {
                 await FileSystem.writeAsStringAsync(fileUri, base64data, {
                   encoding: FileSystem.EncodingType.Base64,
                 });
+                convertMedia(fileUri, data.title);
               };
               reader.readAsDataURL(blob);
               console.log(`Fichier téléchargé et sauvegardé à ${fileUri}`);
+              
+              
               setIsMessageProcessing(false);
             }
-            else{
+            else {
+              try {
                 const url = data.url;
                 const cleanedTitle = cleanFileName(data.title);
-                const fileUrl = FileSystem.documentDirectory + `/${cleanedTitle}.mp4`;
+                const fileUrl = `${FileSystem.documentDirectory}${cleanedTitle}.mp4`;
                   
-                const download = FileSystem.createDownloadResumable(url,fileUrl);
-              
-                const { url: downloadedUrl } = await download.downloadAsync();
+                const download = FileSystem.createDownloadResumable(url, fileUrl);
+                
+                const { uri: downloadedUrl } = await download.downloadAsync();
                 console.log(`Fichier téléchargé et sauvegardé à ${downloadedUrl}`);
+                
+                convertMedia(downloadedUrl, data.title);
                 setIsMessageProcessing(false);
-                // convertMedia(downloadedUrl);
-            }        
+              } catch (error) {
+                console.log(`Erreur: ${error}`);
+                // Ajouter ici une logique pour gérer l'erreur
+              }
+            }
           };
           downloadFile();
         }    
@@ -93,7 +154,7 @@ export default function WebScreen() {
   let currentTitle = '';
   let isMusicAlreadyPlayed = false;
   
-  const runFirst = `
+  const SoundcloudJavascript = `
   (function() {
    let hlsUrls = []; // tableau pour stocker les urls car a chaque navigation elles restent en mémoire et le code récupère la première url qu'il trouve, donc on stocke les urls dans un tableau et on récupère la dernière
    isMusicAlreadyPlayed = false; // variable pour savoir si la musique a déjà été jouée pour activer le click sur le bouton play
@@ -140,8 +201,9 @@ export default function WebScreen() {
           lastHlsUrl = hlsUrls[hlsUrls.length - 1];  // prend toujours le dernier
           currentUrl = hlsUrls[hlsUrls.length - 1];
           //  window.ReactNativeWebView.postMessage("Dernière URL HLS"+lastHlsUrl+ "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA Nouvelle instance de XMLHttpRequest:"+ this._requestId + "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" + getTitleElement().innerText);
-           checkAndSendData("Check des requetes");
-          
+          setTimeout(() => {
+            checkAndSendData("Check des requetes");
+          }, 2000);
         }
       });
       open.apply(this, arguments);
@@ -227,54 +289,128 @@ export default function WebScreen() {
   })();
   true;
   `;
-  // const runFirst = `
-  // (function() {
+
+
+
+
+
+
+
+
+
+
+
+  const YoutubeJavascript = `
+  (function() {
+
+    function sendData(action, url, title) {
+      const data = { "action" : action, "url" : url, "title" : title }; // l'objet a renvoyer
+      window.ReactNativeWebView.postMessage(JSON.stringify(data)); // on envoie l'objet en string (la fonction reçoit une string)
+    }
+
+    // Fonction pour obtenir le titre
+    function getTitleElement() {
+      return document.querySelector('[class*="metadata-title"] span');
+    }
+
+    function checkAndSendData(action) {
+      if (lastHlsUrl && currentTitle && action == "play") { // si on a la derniere url et le titre
   
-  //   // Fonction pour ajouter des écouteurs d'événements aux éléments média (vidéo ou audio)
-  //   function addEventListenersToMedia(mediaElements) {
-  //     mediaElements.forEach(media => {
-  //       media.addEventListener('play', function() {
-  //         window.ReactNativeWebView.postMessage('play'); // Envoi d'un message lorsque la vidéo est en lecture
-  //         window.ReactNativeWebView.postMessage(media.src);
-  //       });
-  //       media.addEventListener('pause', function() {
-  //         window.ReactNativeWebView.postMessage('pause'); // Envoi d'un message lorsque la vidéo est en pause
-  //       });
-  //     });
-  //   }
+        // une dernière vérification pour être sur que le titre est bien le bon
+        if(currentTitle !== getTitleElement().innerText){ 
+          currentTitle = getTitleElement().innerText;
+        }
   
-  //   // Vérifie si les écouteurs d'événements ont déjà été ajoutés
-  //   if (!window.myEventListenersAdded) {
+        // window.ReactNativeWebView.postMessage("Action :"+ action +"Dernière URL HLS"+currentUrl + "AAAAAAAAAAAAAAAAAAAAA"+ currentTitle);
   
-  //     // Ajout des écouteurs aux médias déjà présents au chargement de la page
-  //     const videos = document.querySelectorAll('video');
-  //     const audios = document.querySelectorAll('audio');
-  //     addEventListenersToMedia(videos);
-  //     addEventListenersToMedia(audios);
+        sendData(action, lastHlsUrl, currentTitle); // on envoie les données
+        lastHlsUrl = '';  // Réinitialisez l'url pour le prochain son (pour éviter de renvoyer la même url)
+        // isMusicAlreadyPlayed = true;
+      }
+      else if(action == "pause"){
+        // sendData(action, currentUrl, currentTitle);
+      }
   
-  //     // Création d'un observateur pour détecter les nouveaux éléments média ajoutés à la page
-  //     const observer = new MutationObserver(mutations => {
-  //       mutations.forEach(mutation => {
-  //         mutation.addedNodes.forEach(newNode => {
-  //           if (newNode.tagName === 'VIDEO' || newNode.tagName === 'AUDIO') {
-  //             addEventListenersToMedia([newNode]); // Ajout des écouteurs au nouvel élément média
-  //           }
-  //         });
-  //       });
-  //     });
+      
+    }
+
+
+    // Observer spécifique pour le titre
+    const titleObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => { // pour chaque mutation
+        if (mutation.addedNodes && mutation.addedNodes.length > 0) { // si un noeud a été ajouté
+          for (let i = 0; i < mutation.addedNodes.length; i++) { // pour chaque noeud ajouté
+            const node = mutation.addedNodes[i]; // on recupere le noeud
+            if (node.querySelector && (node.querySelector('[class*="metadata-title"] span') )) { // si le noeud contient le titre
+              // Le titre a été ajouté, envoyer les données.
+              
+              currentTitle = getTitleElement().innerText; // avant cette ligne le titre est vide
+              // sendData('load', lastHlsUrl, getTitleElement().innerText);
+
+              // isMusicAlreadyPlayed = false; // ce code se trigger au chargement de la page donc le son n'est pas encore joué
+              setTimeout(() => {
+                checkAndSendData("title obserever");
+              }, 2000);
+            }
+          }
+        }
+      });
+    });
   
-  //     // Configuration de l'observateur pour qu'il observe les modifications du DOM dans tout le document
-  //     observer.observe(document.body, {
-  //       childList: true, // Observe les nœuds enfants ajoutés ou supprimés
-  //       subtree: true    // Observe également toutes les sous-arborescences
-  //     });
+    // Fonction pour ajouter des écouteurs d'événements aux éléments média (vidéo ou audio)
+    function addEventListenersToMedia(mediaElements) {
+      mediaElements.forEach(media => {
+        media.addEventListener('play', function() {
+          // window.ReactNativeWebView.postMessage('play'); // Envoi d'un message lorsque la vidéo est en lecture
+          // window.ReactNativeWebView.postMessage(media.src);
+          lastHlsUrl = media.src;
+          currentUrl = media.src;
+          setTimeout(() => {
+            checkAndSendData("play");
+          }, 2000);
+        });
+        media.addEventListener('pause', function() {
+          // window.ReactNativeWebView.postMessage('pause'); // Envoi d'un message lorsque la vidéo est en pause
+          setTimeout(() => {
+            checkAndSendData("pause");
+          }, 2000);
+        });
+      });
+    }
   
-  //     // Indique que les écouteurs ont été ajoutés
-  //     window.myEventListenersAdded = true;
-  //   }
-  // })();
-  // true; // Retourne true pour indiquer que le script a bien été exécuté
-  // `;
+    // Vérifie si les écouteurs d'événements ont déjà été ajoutés
+    if (!window.myEventListenersAdded) {
+  
+      // Ajout des écouteurs aux médias déjà présents au chargement de la page
+      const videos = document.querySelectorAll('video');
+      addEventListenersToMedia(videos);
+  
+      // Création d'un observateur pour détecter les nouveaux éléments média ajoutés à la page
+      const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+          mutation.addedNodes.forEach(newNode => {
+            if (newNode.tagName === 'VIDEO') {
+              addEventListenersToMedia([newNode]); // Ajout des écouteurs au nouvel élément média
+            }
+          });
+        });
+      });
+
+      // Initier l'observation du titre
+    titleObserver.observe(document.body, { childList: true, subtree: true });
+  
+      // Configuration de l'observateur pour qu'il observe les modifications du DOM dans tout le document
+      observer.observe(document.body, {
+        childList: true, // Observe les nœuds enfants ajoutés ou supprimés
+        subtree: true    // Observe également toutes les sous-arborescences
+      });
+  
+      // Indique que les écouteurs ont été ajoutés
+      window.myEventListenersAdded = true;
+    }
+  })();
+  true; // Retourne true pour indiquer que le script a bien été exécuté
+  `;
 
   const handleNavigationStateChange = (navState) => {
     const { url } = navState;
@@ -292,7 +428,11 @@ export default function WebScreen() {
     }
 
     // Réinjecte le JavaScript lorsque la navigation change
-    webViewRef.current?.injectJavaScript(runFirst);
+    if(uri.includes('soundcloud')){
+      webViewRef.current?.injectJavaScript(SoundcloudJavascript);
+    }else if(uri.includes('youtube')){
+      webViewRef.current?.injectJavaScript(YoutubeJavascript);
+    }
   };
 
   const onDebugMessageHandler = (event) => {
@@ -311,7 +451,7 @@ export default function WebScreen() {
         ref={webViewRef} // Utilisation de la référence pour le WebView
         source={{ uri }}
         style={{ flex: 5, backgroundColor: 'green' }}
-        injectedJavaScript={runFirst}
+        injectedJavaScript={uri.includes('soundcloud') ? SoundcloudJavascript : (uri.includes('youtube') ? YoutubeJavascript : null)}
         onMessage={onMessageHandler}
         // onMessage={onDebugMessageHandler}
         onNavigationStateChange={handleNavigationStateChange}
