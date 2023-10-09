@@ -5,9 +5,12 @@ import PlayBtn from '../assets/PlayBtn';
 
 
 
-export default function  FileThumbnail({ data }) {
+export default function  FileThumbnail({ data , onSelect}) {
 
     const [thumbnail, setThumbnail] = useState(null);
+    const handleClick = () => {
+      onSelect(data.url);
+    };
 
     useEffect(() => {
         console.log("test" +data);
@@ -45,6 +48,7 @@ export default function  FileThumbnail({ data }) {
     }
 
     return (
+      <Pressable onPress={handleClick}>
         <View style={{ backgroundColor: "#fff", width: "33%", height: 120 , position: 'relative', alignItems: 'center', marginBottom: 50}}>
              {thumbnail && (
               <>
@@ -67,5 +71,7 @@ export default function  FileThumbnail({ data }) {
             <Text>{formatSize(data.size)}</Text>
             <Text>{data.date}</Text>
         </View>    
+      </Pressable>
+        
     );
 }
