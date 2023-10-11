@@ -11,105 +11,189 @@ export default function  PromotionsScreen() {
   const [sound, setSound] = useState(null);
   const [data, setData] = useState([])
   const [selectedUrl, setSelectedUrl] = useState(null);
-  // const [boxHeight, setBoxHeight] = useState("50%"); // Hauteur initiale
+
   const windowWidth = Dimensions.get('window').width;
   const windowHeight = Dimensions.get('window').height;
+  const isBottom = useRef(false);
 
-
+  const opacity = useRef(new Animated.Value(1)).current;
   const boxHeight = useRef(new Animated.Value(270)).current;
   const boxWidth = useRef(new Animated.Value(windowWidth)).current;
   const panY = useRef(new Animated.Value(0)).current;
   const panX = useRef(new Animated.Value(0)).current;
-  const dragDirection = useRef(new Animated.Value(0)).current;
+  
 
+  let initialX = 0;
+  let initialY = 0;
+  let lockedDirection = null;
   const initialVals = useRef({x: 0, y: 0, height: 270, width: windowWidth});
   
   let tapGesture = false;
 
+  const mooveAnimation = (gestureY , initialH , initialW) => {
+    let deltaY = gestureY * 1.35; // values for the position of the block when is mooving (may depend of the device)
+    let deltaX = deltaY * 0.45;
+    let newHeight;
+    let newWidth;
+  
+    // if the block is mooving up, decrease the size of the block
+    if (deltaY >= 0) {
+      newHeight = Math.max(100, initialH - deltaY);
+      newWidth = Math.max(150, initialW - deltaX);
+    } else {
+      // else increase the size of the block
+      newHeight = Math.min(270, initialH - deltaY);
+      newWidth = Math.min(windowWidth, initialW - deltaX);
+    }
+  
+    // set the limits 
+    let targetY = initialY + deltaY;
+    let targetX = initialX + deltaX;
+
+    targetY = Math.min(Math.max(targetY, 0), 610); // position for iphone 11
+    targetX = Math.min(Math.max(targetX, 0), 250); 
+    
+    // set the new values at each frame
+    boxHeight.setValue(newHeight);
+    boxWidth.setValue(newWidth);
+    panY.setValue(targetY);
+    panX.setValue(targetX);
+  }
+
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => {
-        tapGesture = true;
+        tapGesture = true; // if the user touches the block, it's a tap gesture
         return true;
       },
       onMoveShouldSetPanResponder: () => {
-        tapGesture = false;
+        tapGesture = false; // if the user moves the block, it's a drag gesture, not a tap
         return true;
       },
       onPanResponderMove: (_, gestureState) => {
-        console.log("x", gestureState.dx, "y", gestureState.dy);
-        // Empêcher le mouvement si le carré est déjà dans la position limite
-        if ((initialY >= 660 && gestureState.dy > 0) || (initialHeight <= 100 && gestureState.dy > 0)) {
-          return;
-        }
-      
-        let deltaY = gestureState.dy * 1.35;
-        let deltaX = deltaY * 0.45;
-        let newHeight;
-        let newWidth;
-      
-        if (deltaY >= 0) {
-          newHeight = Math.max(100, initialHeight - deltaY);
-          newWidth = Math.max(100, initialWidth - deltaX);
-        } else {
-          newHeight = Math.min(270, initialHeight - deltaY);
-          newWidth = Math.min(windowWidth, initialWidth - deltaX);
-        }
-      
-        // Appliquer les limites
-        let targetY = initialY + deltaY;
-        let targetX = initialX + deltaX;
 
-        targetY = Math.min(Math.max(targetY, 0), 660); // entre 0 et 660
-        targetX = Math.min(Math.max(targetX, 0), 300); // entre 0 et 300
-        
-        boxHeight.setValue(newHeight);
-        boxWidth.setValue(newWidth);
-        panY.setValue(targetY);
-        panX.setValue(targetX);
+        // if the block is at the bottom , lock the direction of the gesture
+        if (!lockedDirection) {
+          if (Math.abs(gestureState.dy) > Math.abs(gestureState.dx)) {
+            lockedDirection = "vertical";
+          } else {
+            lockedDirection = "horizontal";
+          }
+        }
+
+        // if the block is at the bottom 
+        if (isBottom.current) {
+
+          // if the direction is horizontal, move the block horizontally and fade it out
+          if (lockedDirection === "horizontal") {
+            panX.setValue(initialX + gestureState.dx);
+            let newOpacity = 1 - Math.abs(gestureState.dx) / windowWidth;
+            newOpacity = Math.max(0, Math.min(1, newOpacity)); // Limiter entre 0 et 1
+            opacity.setValue(newOpacity);
+          } else {
+            // else moove to the top
+            mooveAnimation(gestureState.dy , initialHeight , initialWidth)
+          }
+        } else {
+      
+
+          // Disable the vertical gesture if the block is at the top
+          if ((initialY >= 610 && gestureState.dy > 0) || (initialHeight <= 100 && gestureState.dy > 0)) {
+            return;
+          }
+
+          mooveAnimation(gestureState.dy , initialHeight , initialWidth)
+        }
       },
+      // When the user touches the block set the initial values
       onPanResponderGrant: () => {
         const { x, y, height, width } = initialVals.current;
         initialX = x;
         initialY = y;
         initialHeight = height;
         initialWidth = width;      
-      },
-      onPanResponderRelease: () => {
+        lockedDirection = null; // reset the locked direction
+      }, 
+
+      // When the user releases the block
+      onPanResponderRelease: (_, gestureState) => {
+
+        // if the block is at the bottom and the direction is horizontal AND the distance was more than 150 px => close the block
+        if (isBottom && Math.abs(gestureState.dx) > 150) {
+          Animated.parallel([
+            Animated.timing(panX, {
+              toValue: gestureState.dx > 0 ? windowWidth : -windowWidth, // move the block out of the screen
+              duration: 300,
+              useNativeDriver: false, 
+            }),
+            Animated.timing(opacity, {
+              toValue: 0, // fade out the block
+              duration: 300,
+              useNativeDriver: false,
+            }),
+          ]).start(() => {
+            setSelectedUrl(null); // reset the selected video url
+          });
+          return;
+        }
+
+        // if the block is at the bottom and the direction is horizontal AND the distance was less than 150 px => reset the block to initial bottom position
+        else if(isBottom.current && Math.abs(gestureState.dx) < 150) { 
+          // Reset opacity
+          opacity.setValue(1);
+          
+          // set the block to initial bottom position
+          panX.setValue(initialVals.current.x);
+          panY.setValue(initialVals.current.y);
+          boxHeight.setValue(initialVals.current.height);
+          boxWidth.setValue(initialVals.current.width);
+        }
+
+
         let currentX = panX._value;
         let currentY = panY._value;
         let currentHeight = boxHeight._value;
         let currentWidth = boxWidth._value;
       
-        const threshold = 100; // distance en pixels pour déclencher la transition
+        const threshold = 100; // minimal distance to trigger animation
         
-        let targetX = initialX;
+        let targetX = initialX; // target values for animation transition (reset to initial values by default)
         let targetY = initialY;
         let targetHeight = initialHeight;
         let targetWidth = initialWidth;
       
-        if (tapGesture && initialY === 660) {  // Si c'est un tap et que le bloc est en bas
+        // if the gesture is a tap and the block is at the bottom of the screen, move it to the top
+        if (tapGesture && initialY === 610) {  
           targetY = 0;
           targetX = 0;
           targetHeight = 270;
           targetWidth = windowWidth;
         }
 
-        // Depuis la position initiale
+        // Animation down values
         if (initialY === 0 && currentY > threshold) {
-          targetY = 660;
-          targetX = 300;
+          targetY = 610;
+          targetX = 250;
           targetHeight = 100;
-          targetWidth = 100;
+          targetWidth = 150;
         }
-        // Pour la remontée
-        else if (initialY === 660 && currentY < initialY - threshold) {
+        // Anivmation up values
+        else if (initialY === 610 && currentY < initialY - threshold) {
           targetY = 0;
           targetX = 0;
           targetHeight = 270;
           targetWidth = windowWidth;
         }
-      
+
+        // if the block is at the bottom, set the flag to true
+        if (targetY === 610) { 
+          isBottom.current = true;
+        } else {
+          isBottom.current = false;
+        }
+        
+       // Animation up or down with size change
         Animated.parallel([
           Animated.spring(panX, {
             toValue: targetX,
@@ -148,7 +232,6 @@ export default function  PromotionsScreen() {
 
       fetchFiles();
 
-
       const db = SQLite.openDatabase('files.db');
 
       db.transaction(tx => {
@@ -160,6 +243,20 @@ export default function  PromotionsScreen() {
       });
       
     }, []);
+
+
+    // reset animation values when a new video is selected
+    useEffect(() => {
+      if (selectedUrl !== null) {
+        panX.setValue(0);
+        panY.setValue(0);
+        boxHeight.setValue(270);
+        boxWidth.setValue(windowWidth);
+        opacity.setValue(1);
+        isBottom.current = false;
+        initialVals.current = { x: 0, y: 0, height: 270, width: windowWidth };
+      }
+    }, [selectedUrl]);
   
     return (
         <SafeAreaView>
@@ -173,18 +270,7 @@ export default function  PromotionsScreen() {
               </View>
             </ScrollView>
 
-            <View>
-
-            <Modal 
-              style={{ width: "100%", margin: 0 }} 
-              isVisible={selectedUrl !== null} 
-              animationType="slide"  
-              swipeDirection= {"down"}
-              panResponderThreshold={500}
-              // onSwipeComplete={() => setBoxHeight("25%")}  // Réduire la taille ici
-              // onSwipeCancel={() => setBoxHeight("50%")}
-            >
-            <SafeAreaView style={{ flex: 1 }}>
+            {selectedUrl && 
             <Animated.View
               {...panResponder.panHandlers}
               style={{
@@ -192,30 +278,35 @@ export default function  PromotionsScreen() {
                 width: boxWidth,
                 height: boxHeight,
                 transform: [{ translateX: panX }, { translateY: panY }],
+                position: 'absolute',
+                opacity: isBottom ? opacity : 1,
                 zIndex: 999,
-                // position: 'absolute',
               }}
-            ></Animated.View>
-              <Pressable
-                onPress={() => setSelectedUrl(null)}>
-                <Text style={styles.textStyle}>Hide Modal</Text>
-              </Pressable>
-              </SafeAreaView>
-            </Modal>
-            
-            </View>
+            >
+              <Video
+                source={{ uri: selectedUrl }}
+                rate={1.0}
+                volume={1.0}
+                isMuted={false}
+                resizeMode="cover"
+                shouldPlay
+                isLooping
+                style={{ width: '100%', height: '100%' }}
+              />
+            </Animated.View>
+          }
         </SafeAreaView>
     );
 }
 const styles = StyleSheet.create({
-        container: {
-          backgroundColor: '#fff',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          padding: 10,
-          width: '100%',
+  container: {
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 10,
+    width: '100%',
 
-        },
-      });
+  },
+});
