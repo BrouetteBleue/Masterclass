@@ -11,13 +11,15 @@ export default function  PromotionsScreen() {
   const [sound, setSound] = useState(null);
   const [data, setData] = useState([])
   const [selectedUrl, setSelectedUrl] = useState(null);
+  const [videoHeight, setVideoHeight] = useState("30%");
 
   const windowWidth = Dimensions.get('window').width;
   const windowHeight = Dimensions.get('window').height;
-  const isBottom = useRef(false);
+  const [isBottom, setIsBottom] = useState(false);
+
 
   const opacity = useRef(new Animated.Value(1)).current;
-  const boxHeight = useRef(new Animated.Value(270)).current;
+  const boxHeight = useRef(new Animated.Value(windowHeight)).current;
   const boxWidth = useRef(new Animated.Value(windowWidth)).current;
   const panY = useRef(new Animated.Value(0)).current;
   const panX = useRef(new Animated.Value(0)).current;
@@ -26,7 +28,7 @@ export default function  PromotionsScreen() {
   let initialX = 0;
   let initialY = 0;
   let lockedDirection = null;
-  const initialVals = useRef({x: 0, y: 0, height: 270, width: windowWidth});
+  const initialVals = useRef({x: 0, y: 0, height: windowHeight, width: windowWidth});
   
   let tapGesture = false;
 
@@ -42,7 +44,7 @@ export default function  PromotionsScreen() {
       newWidth = Math.max(150, initialW - deltaX);
     } else {
       // else increase the size of the block
-      newHeight = Math.min(270, initialH - deltaY);
+      newHeight = Math.min(windowHeight, initialH - deltaY);
       newWidth = Math.min(windowWidth, initialW - deltaX);
     }
   
@@ -83,7 +85,7 @@ export default function  PromotionsScreen() {
         }
 
         // if the block is at the bottom 
-        if (isBottom.current) {
+        if (isBottom) {
 
           // if the direction is horizontal, move the block horizontally and fade it out
           if (lockedDirection === "horizontal") {
@@ -139,7 +141,7 @@ export default function  PromotionsScreen() {
         }
 
         // if the block is at the bottom and the direction is horizontal AND the distance was less than 150 px => reset the block to initial bottom position
-        else if(isBottom.current && Math.abs(gestureState.dx) < 150) { 
+        else if(isBottom && Math.abs(gestureState.dx) < 150) { 
           // Reset opacity
           opacity.setValue(1);
           
@@ -167,7 +169,7 @@ export default function  PromotionsScreen() {
         if (tapGesture && initialY === 610) {  
           targetY = 0;
           targetX = 0;
-          targetHeight = 270;
+          targetHeight = windowHeight;
           targetWidth = windowWidth;
         }
 
@@ -182,15 +184,17 @@ export default function  PromotionsScreen() {
         else if (initialY === 610 && currentY < initialY - threshold) {
           targetY = 0;
           targetX = 0;
-          targetHeight = 270;
+          targetHeight = windowHeight;
           targetWidth = windowWidth;
         }
 
         // if the block is at the bottom, set the flag to true
         if (targetY === 610) { 
-          isBottom.current = true;
+          setIsBottom(true);
+          console.log("bottom");
         } else {
-          isBottom.current = false;
+          setIsBottom(false);
+          // console.log("bottom");
         }
         
        // Animation up or down with size change
@@ -244,17 +248,21 @@ export default function  PromotionsScreen() {
       
     }, []);
 
+    useEffect(() => {
+      console.log("caca");
+      setVideoHeight(isBottom ? "100%" : "30%");
+    }, [isBottom]);
 
     // reset animation values when a new video is selected
     useEffect(() => {
       if (selectedUrl !== null) {
         panX.setValue(0);
         panY.setValue(0);
-        boxHeight.setValue(270);
+        boxHeight.setValue(windowHeight);
         boxWidth.setValue(windowWidth);
         opacity.setValue(1);
-        isBottom.current = false;
-        initialVals.current = { x: 0, y: 0, height: 270, width: windowWidth };
+        setIsBottom(false);
+        initialVals.current = { x: 0, y: 0, height: windowHeight, width: windowWidth };
       }
     }, [selectedUrl]);
   
@@ -283,16 +291,18 @@ export default function  PromotionsScreen() {
                 zIndex: 999,
               }}
             >
-              <Video
-                source={{ uri: selectedUrl }}
-                rate={1.0}
-                volume={1.0}
-                isMuted={false}
-                resizeMode="cover"
-                shouldPlay
-                isLooping
-                style={{ width: '100%', height: '100%' }}
-              />
+              {/* <View style={{ width: '100%', height: isBottom ? '100%' : '30%' }}> */}
+                <Video
+                  source={{ uri: selectedUrl }}
+                  rate={1.0}
+                  volume={1.0}
+                  isMuted={false}
+                  resizeMode="cover"
+                  shouldPlay
+                  isLooping
+                  style={{ width: '100%', height: videoHeight }}
+                />
+              {/* </View> */}
             </Animated.View>
           }
         </SafeAreaView>
@@ -307,6 +317,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     padding: 10,
     width: '100%',
+    height: '100%',
 
   },
 });
