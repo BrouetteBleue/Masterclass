@@ -52,9 +52,9 @@ export default function  FileThumbnail({ data , onSelect}) {
         <View style={{ backgroundColor: "#fff", width: "33%", height: 120 , position: 'relative', alignItems: 'center', marginBottom: 50}}>
              {thumbnail && (
               <>
-              <Image
-                source={thumbnail}
-                style={{ width: 100, height: 70, backgroundColor: "red", }}  // Ajoutez un style pour voir l'image
+                <Image
+                  source={thumbnail}
+                  style={{ width: 100, height: 70, backgroundColor: "red", }}  // Ajoutez un style pour voir l'image
                 />
                 <View style={{
                   position: 'absolute',
