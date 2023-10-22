@@ -4,25 +4,27 @@ import { Video , Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import { EventRegister } from 'react-native-event-listeners';
-import PlayerPauseBtn from './Buttons/PlayerPauseBtn';
-import PlayerSkipBtn from './Buttons/PlayerSkipBtn';
-import PlayerPlayBtn from './Buttons/PlayerPlayBtn';
+import MediaPlayerControl from './MediaPlayerControl';
 
 export default function  MediaPlayer( {url} ) {
 
     const [mediaFiles, setMediaFiles] = useState([]);
     const [sound, setSound] = useState(null);
     const [data, setData] = useState([])
-  
+    const videoRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(true);
     const [isMediaControlVisible, setIsMediaControlVisible] = useState(true);
     const [timerId, setTimerId] = useState(null);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+    const [loopState, setLoopState] = useState(0);
 
+    const [isAtBottom, setIsAtBottom] = useState(false); // flag for the rest of the app
 
     // Animation vars
     const windowWidth = Dimensions.get('window').width;
     const windowHeight = Dimensions.get('window').height;
-    const isBottom = useRef(false);
+    const isBottom = useRef(false);// flag for the animation
     const oldGestureY = useRef(0);
     const listOpacity = useRef(new Animated.Value(1)).current;
     const opacity = useRef(new Animated.Value(1)).current;
@@ -116,12 +118,14 @@ export default function  MediaPlayer( {url} ) {
         onStartShouldSetPanResponder: () => {
           console.log("onStartShouldSetPanResponder");
           tapGesture = true; // if the user touches the block, it's a tap gesture
+          setIsMediaControlVisible(false);     
           return true;
         },
         onMoveShouldSetPanResponder: () => {
           console.log("onMoveShouldSetPanResponder");
           tapGesture = false; // if the user moves the block, it's a drag gesture, not a tap
           console.log("tapGesture", tapGesture);
+          setIsMediaControlVisible(false);     
           return true;
         },
         onPanResponderMove: (_, gestureState) => {
@@ -140,7 +144,6 @@ export default function  MediaPlayer( {url} ) {
   
           // if the block is at the bottom 
           if (isBottom.current) {
-  
             // if the direction is horizontal, move the block horizontally and fade it out
             if (lockedDirection.current === "horizontal") {
               panX.setValue(initialX + gestureState.dx);
@@ -228,7 +231,7 @@ export default function  MediaPlayer( {url} ) {
         
           // if the gesture is a tap and the block is at the bottom of the screen, move it to the top
           if (tapGesture && initialY === 610) {  
-            // console.log("currentY", currentY, "threshold", threshold , "initialY", initialY, "currentY - initialY", currentY - 100);
+            console.log("currentY", currentY, "threshold", threshold , "initialY", initialY, "currentY - initialY", currentY - 100);
             targetY = 0;
             targetX = 0;
             targetHeight = windowHeight;
@@ -262,10 +265,12 @@ export default function  MediaPlayer( {url} ) {
           }
   
           // if the block is at the bottom, set the flag to true
-          if (targetY === 610) { 
+          if (targetY >= 500) { 
             isBottom.current = true;
+            setIsAtBottom(true);
           } else {
             isBottom.current = false;
+            setIsAtBottom(false);
           }
   
           if (initialY === 0 && currentY > threshold) {
@@ -326,6 +331,9 @@ export default function  MediaPlayer( {url} ) {
         }
 
         const handleTap = () => {
+          if(isBottom.current) {
+            return;
+          }
           setIsMediaControlVisible(!isMediaControlVisible);       
           hideMediaControl();
         };
@@ -339,8 +347,26 @@ export default function  MediaPlayer( {url} ) {
         }
 
         const handleSkipForward = async () => {
-          console.log("skip");
+          console.log("skip");  
         }
+
+        const handleMute = async () => {
+          setIsMuted(!isMuted);
+        }
+
+        const handleLoop = async () => {
+          console.log("loop");
+        }
+
+        const handleFullScreen = async () => {
+          goFullscreen();
+          setIsFullscreen(!isFullscreen);
+
+        }
+
+        const goFullscreen = () => {
+          videoRef.current.presentFullscreenPlayer();
+        };
 
         const hideMediaControl = () => {
           if (timerId) {
@@ -372,51 +398,46 @@ export default function  MediaPlayer( {url} ) {
                 alignItems: 'flex-start',
               }}
             >
-              <View {...panResponder.panHandlers} style={{ width: '100%', height: '26%',minHeight: 100, zIndex: 1}}>
-                <Video
-                  source={{ uri: url }}
-                  rate={1.0}
-                  volume={1.0}
-                  isMuted={false}
-                  resizeMode={videoResizeMode}
-                  shouldPlay={isPlaying}
-                  isLooping
-                  style={{ width: "100%", height: "100%", minHeight: 100, backgroundColor: 'blue'}}
-                  aspectRatio={16/9}
-                  pointerEvents="none"
-                />
-                <TouchableWithoutFeedback onPress={handleTap}>
-                  <View style={{ width: '100%', height: '100%', position: 'absolute',top: 0,left: 0,}}>
-                    {isMediaControlVisible && (
-                      <View style={{
-                          width: '100%',
-                          height: '100%',
-                          backgroundColor: 'rgba(0, 0, 0, 0.5)', // Opacité seulement pour le fond
-                          // opacity: 0.5,
-                          // backgroundColor: "black",
-                          flexDirection: 'row',
-                          flex:1,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <PlayerSkipBtn style={{ width:"100%", height:"100%", transform: [{rotate: '180deg'}] }} onPress={handleSkipBackward}/>
-                        {isPlaying ? <PlayerPauseBtn style={{ width:"100%", height:"100%", margin: 30 }} onPress={handlePlay}/> : <PlayerPlayBtn style={{ width:"100%", height:"100%", margin: 30 }} onPress={handlePlay}/>}       
-                        <PlayerSkipBtn style={{ width:"100%", height:"100%", }} onPress={handleSkipForward}/>
-                      </View>
-                    )}
-                  </View>
-                </TouchableWithoutFeedback>
+          <View {...panResponder.panHandlers} style={{ width: '100%', height: '26%',minHeight: 100, zIndex: 1}}  pointerEvents={isBottom.current ? "none" : "auto"}>
+            <Video
+              ref={videoRef}
+              source={{ uri: url }}
+              rate={1.0}
+              volume={1.0}
+              isMuted={false}
+              resizeMode={videoResizeMode}
+              shouldPlay={isPlaying}
+              isLooping
+              style={{ width: "100%", height: "100%", minHeight: 100, }}
+              aspectRatio={16/9}
+              pointerEvents="none"
+            />
+            {
+            !isBottom.current &&
+            <MediaPlayerControl
+              isMediaControlVisible={isMediaControlVisible}
+              handleTap={handleTap}
+              handleSkipBackward={handleSkipBackward}
+              handlePlay={handlePlay}
+              handleSkipForward={handleSkipForward}
+              handleMute={handleMute}
+              handleLoop={handleLoop}
+              handleFullScreen={handleFullScreen}
+              isPlaying={isPlaying}
+              isMuted={isMuted}
+              loopState={loopState}
+              isFullscreen={isFullscreen}
+            />
+          }
+          </View >
+          <Animated.View style={{ width: '100%', height: '74%', backgroundColor: 'white', opacity: listOpacity}} >
+            <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'green', maxHeight: "20%"  }}  placeholder='caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3'/>
+            <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'brown', maxHeight: "20%" }} placeholder='caca1 caca2 caca3'/>
+            <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'yellow', maxHeight: "20%" }} placeholder='caca1 caca2 caca3'/>
+            <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'pink', maxHeight: "20%" }} placeholder='caca1 caca2 caca3'/>
+          </Animated.View>
 
-              </View >
-              <Animated.View style={{ width: '100%', height: '74%', backgroundColor: 'white', opacity: listOpacity}} >
-                <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'green', maxHeight: "20%"  }}  placeholder='caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3'/>
-                <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'brown', maxHeight: "20%" }} placeholder='caca1 caca2 caca3'/>
-                <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'yellow', maxHeight: "20%" }} placeholder='caca1 caca2 caca3'/>
-                <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'pink', maxHeight: "20%" }} placeholder='caca1 caca2 caca3'/>
-              </Animated.View>
-
-            </Animated.View>
+        </Animated.View>
     );
 
 }
