@@ -52,7 +52,7 @@ export default function  HomeScreen({ setSelectedUrl }) {
   
     return (
         <SafeAreaView>
-            <ScrollView >
+            <ScrollView style={{minHeight:"100%",backgroundColor: '#fff',}}>
               <View style={styles.container} >
                 {data.map((item) => (
                   <React.Fragment key={item.id}>
@@ -61,13 +61,6 @@ export default function  HomeScreen({ setSelectedUrl }) {
                 ))}
               </View>
             </ScrollView>
-
-            {/* {selectedUrl && 
-              <MediaPlayer
-                url={selectedUrl}
-                onClose={() => setSelectedUrl(null)}
-              />
-          } */}
         </SafeAreaView>
     );
 }
@@ -75,11 +68,12 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     flexDirection: 'row',
     flexWrap: 'wrap',
     padding: 10,
     width: '100%',
     height: '100%',
+    minHeight:"100%"
   },
 });

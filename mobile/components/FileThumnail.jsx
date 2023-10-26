@@ -48,8 +48,8 @@ export default function  FileThumbnail({ data , onSelect}) {
     }
 
     return (
-      <Pressable onPress={handleClick}>
-        <View style={{ backgroundColor: "#fff", width: "33%", height: 120 , position: 'relative', alignItems: 'center', marginBottom: 50}}>
+      <Pressable onPress={handleClick} style={{ width:"33%"}}>
+        <View style={{ backgroundColor: "#fff",  height: 120 , position: 'relative', alignItems: 'center', marginBottom: 50}}>
              {thumbnail && (
               <>
                 <Image
