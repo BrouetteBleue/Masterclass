@@ -13,10 +13,12 @@ type RootTabParamList = {
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
-export const BottomTab = () => {
+export const BottomTab = ({ setSelectedUrl }) => {
     return (
         <Tab.Navigator>
-            <Tab.Screen name="Home" component={HomeScreen} />
+            <Tab.Screen name="Home">
+                {props => <HomeScreen {...props} setSelectedUrl={setSelectedUrl} />}
+            </Tab.Screen>
             <Tab.Screen name="Profile" component={WebScreen} />
             <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>

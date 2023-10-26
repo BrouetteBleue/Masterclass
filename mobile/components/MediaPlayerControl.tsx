@@ -17,7 +17,7 @@ interface MediaPlayerControlProps {
     isPlaying: boolean;
   }
 
-  enum LoopState {
+  export enum LoopState {
     NoLoop = 0,
     Loop1 = 1,
     Loop2 = 2,
@@ -136,6 +136,7 @@ const MediaPlayerControl: React.FC<MediaPlayerControlProps> = ({
                                 ]}
                                 viewBox="0 0 512 512"
                                 size={25}
+                                fill='red'
                             />
                         }
                         

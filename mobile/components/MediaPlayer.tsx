@@ -1,12 +1,19 @@
 import { StyleSheet, Text, View, Pressable, ScrollView, Animated, PanResponder, TextInput, Button, Alert, FlatList, SafeAreaView ,TouchableWithoutFeedback, Dimensions} from 'react-native';
 import React, { useState, useEffect, useRef } from 'react';
-import { Video , Audio } from 'expo-av';
+import { Video , Audio, ResizeMode } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import { EventRegister } from 'react-native-event-listeners';
-import MediaPlayerControl from './MediaPlayerControl';
+import MediaPlayerControl, { LoopState } from './MediaPlayerControl';
 
-export default function  MediaPlayer( {url} ) {
+
+interface MediaPlayerProps {
+    url: string;
+    onClose: () => void;
+  }
+
+
+export default function  MediaPlayer( {url, onClose}: MediaPlayerProps) {
 
     const [mediaFiles, setMediaFiles] = useState([]);
     const [sound, setSound] = useState(null);
@@ -15,36 +22,38 @@ export default function  MediaPlayer( {url} ) {
     const [isPlaying, setIsPlaying] = useState(true);
     const [isMediaControlVisible, setIsMediaControlVisible] = useState(true);
     const [timerId, setTimerId] = useState(null);
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isFullScreen, setIsFullScreen] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
-    const [loopState, setLoopState] = useState(0);
+    const [loopState, setLoopState] = useState<LoopState>(LoopState.NoLoop);
 
     const [isAtBottom, setIsAtBottom] = useState(false); // flag for the rest of the app
 
     // Animation vars
     const windowWidth = Dimensions.get('window').width;
-    const windowHeight = Dimensions.get('window').height;
+    const windowHeight = Dimensions.get('window').height -90;
     const isBottom = useRef(false);// flag for the animation
     const oldGestureY = useRef(0);
     const listOpacity = useRef(new Animated.Value(1)).current;
     const opacity = useRef(new Animated.Value(1)).current;
     const boxHeight = useRef(new Animated.Value(windowHeight)).current;
     const boxWidth = useRef(new Animated.Value(windowWidth)).current;
-    const panY = useRef(new Animated.Value(0)).current;
+    const panY = useRef(new Animated.Value(90)).current;
     const panX = useRef(new Animated.Value(0)).current;
-    const [videoResizeMode, setVideoResizeMode] = useState('cover');
-    const initialVals = useRef({x: 0, y: 0, height: windowHeight, width: windowWidth});
+    const [videoResizeMode, setVideoResizeMode] = useState<ResizeMode>(ResizeMode.COVER);
+    const initialVals = useRef({x: 0, y: 90, height: windowHeight, width: windowWidth});
     const lockedDirection = useRef(null);
     let initialX = 0;
-    let initialY = 0;
+    let initialY = 90;
+    let initialHeight: number;
+    let initialWidth: number;
     let tapGesture = false;
   
-    const mooveAnimation = (gestureY , initialH , initialW, direction) => {
-      let deltaY = gestureY * 1.45; // values for the position of the block when is mooving (may depend of the device)
-      let deltaX = deltaY * 0.45;
-      let newHeight;
-      let newWidth;
-      const maxY = 250 // max position of the bloc to remove the "bottom" flag
+    const mooveAnimation = (gestureY: number, initialH: number, initialW: number, direction: string): void => {
+      let deltaY: number = gestureY * 1.45; // values for the position of the block when is mooving (may depend of the device)
+      let deltaX: number = deltaY * 0.45;
+      let newHeight: number;
+      let newWidth: number;
+      const maxY = 240 // max position of the bloc to remove the "bottom" flag
   
       // if the block is mooving down, decrease the size of the block
       if (deltaY >= 0) {
@@ -55,25 +64,29 @@ export default function  MediaPlayer( {url} ) {
         newHeight = initialH - (deltaY * 1.45 ) >= windowHeight ? windowHeight : initialH - deltaY * 1.45;
         newWidth = initialW - deltaX >= windowWidth ? windowWidth : initialW - deltaX;
       }
-    // console.log("newHeight", newHeight, "newWidth", newWidth);
+
       // set the limits 
-      let targetY = initialY + deltaY;
-      let targetX = initialX + deltaX;
+      let targetY: number = initialY + deltaY;
+      let targetX: number = initialX + deltaX;
   
-      targetY = Math.min(Math.max(targetY, 0), 610); // position for iphone 11
-      targetX = Math.min(Math.max(targetX, 0), 250); 
+      targetY = Math.min(Math.max(targetY, 90), 710); // position for iphone 11
+      targetX = Math.min(Math.max(targetX, 0), 240); 
   
       if (newHeight >= windowHeight) {
-        setVideoResizeMode('contain');
+        console.log("contain");
+        
+        setVideoResizeMode(ResizeMode.CONTAIN);
       } else {
-        setVideoResizeMode('cover');
+        console.log("cover");
+        setVideoResizeMode(ResizeMode.COVER)
       }
   
       if (targetY >= maxY) {
         isBottom.current = false;
+        setIsAtBottom(false); // fix le cancel de mouvement si il va pas asser loing
       } 
   
-   console.log("initialH", initialH, "initialW", initialW, "initialY", initialY, "initialX", initialX, "deltaY", deltaY, "deltaX", deltaX, "newHeight", newHeight, "newWidth", newWidth, "targetY", targetY, "targetX", targetX, "isBottom", isBottom.current, "maxY", maxY);
+  //  console.log("initialH", initialH, "initialW", initialW, "initialY", initialY, "initialX", initialX, "deltaY", deltaY, "deltaX", deltaX, "newHeight", newHeight, "newWidth", newWidth, "targetY", targetY, "targetX", targetX, "isBottom", isBottom.current, "maxY", maxY);
       
       // set the new values at each frame
       boxHeight.setValue(newHeight);
@@ -83,28 +96,26 @@ export default function  MediaPlayer( {url} ) {
   
       if(direction === "vertical") {
   
-        if ((initialH >= 610 && gestureY < 0) || (initialH  <= 100 && gestureY > 0)) {
+        if ((initialH >= 710 && gestureY < 0) || (initialH  <= 100 && gestureY > 0)) {
           return;
         }
-        let currentDirection = gestureY > oldGestureY.current ? 'down' : 'up';
-        console.log("currentDirection", currentDirection, "gestureY", gestureY, "oldGestureY", oldGestureY.current );
+
         let opacity = 0;
-        // console.log("oldGestureY", oldGestureY.current, "gestureY", gestureY);
   
         // quand gesture est plus grand que l'ancien = on descend 
         if(oldGestureY.current < gestureY ) {
-          if(initialY === 0) {
+          if(initialY === 90) {
            opacity = 1 - Math.abs(gestureY) / windowWidth;
           }
           else{
             opacity = 0 + Math.abs(gestureY) / windowWidth;
           }
         } else if (oldGestureY.current > gestureY){
-          if(initialY === 610) {
+          if(initialY === 710) {
             opacity = 0 + Math.abs(gestureY) / windowWidth;
           }
           else{
-           opacity = 1 - Math.abs(gestureY) / windowWidth;
+            opacity = 1 - Math.abs(gestureY) / windowWidth;    
           }
         }
         opacity = Math.max(0, Math.min(1, opacity));
@@ -128,11 +139,7 @@ export default function  MediaPlayer( {url} ) {
           setIsMediaControlVisible(false);     
           return true;
         },
-        onPanResponderMove: (_, gestureState) => {
-          // console.log("panY", panY._value , "panX", panX._value);
-          // console.log("gestureState.dy", gestureState.dy);
-          // console.log("listOpacity", listOpacity._value);
-  
+        onPanResponderMove: (_, gestureState) => { 
           // if the block is at the bottom , lock the direction of the gesture
           if (!lockedDirection.current) {
             if (Math.abs(gestureState.dy) > Math.abs(gestureState.dx)) {
@@ -160,7 +167,7 @@ export default function  MediaPlayer( {url} ) {
         
   
             // Disable the vertical gesture if the block is at the top
-            if ((initialY >= 610 && gestureState.dy > 0) || (initialHeight <= 100 && gestureState.dy > 0)) {
+            if ((initialY >= 710 && gestureState.dy > 0) || (initialHeight <= 100 && gestureState.dy > 0)) {
               return;
             }
   
@@ -205,7 +212,6 @@ export default function  MediaPlayer( {url} ) {
   
           // if the block is at the bottom and the direction is horizontal AND the distance was less than 100 px => reset the block to initial bottom position
           else if(isBottom.current && Math.abs(gestureState.dx) < 100) { 
-            console.log("reset", isBottom.current , "targetY", initialY, );
             // Reset opacity
             opacity.setValue(1);
             
@@ -217,12 +223,12 @@ export default function  MediaPlayer( {url} ) {
           } 
         
   
-          let currentX = panX._value;
-          let currentY = panY._value;
-          let currentHeight = boxHeight._value;
-          let currentWidth = boxWidth._value;
+          let currentX = (panX as any)._value;
+          let currentY = (panY as any)._value;
+          let currentHeight = (boxHeight as any)._value;
+          let currentWidth = (boxWidth as any)._value;
         
-          const threshold = 100; // minimal distance to trigger animation
+          const threshold = 200; // minimal distance to trigger animation
           
           let targetX = initialX; // target values for animation transition (reset to initial values by default)
           let targetY = initialY;
@@ -230,9 +236,9 @@ export default function  MediaPlayer( {url} ) {
           let targetWidth = initialWidth;
         
           // if the gesture is a tap and the block is at the bottom of the screen, move it to the top
-          if (tapGesture && initialY === 610) {  
-            console.log("currentY", currentY, "threshold", threshold , "initialY", initialY, "currentY - initialY", currentY - 100);
-            targetY = 0;
+          if (tapGesture && initialY === 710) {  
+            // console.log("currentY", currentY, "threshold", threshold , "initialY", initialY, "currentY - initialY", currentY - 100);
+            targetY = 90;
             targetX = 0;
             targetHeight = windowHeight;
             targetWidth = windowWidth;
@@ -244,16 +250,16 @@ export default function  MediaPlayer( {url} ) {
           }
   
           // Animation down values
-          if (initialY === 0 && currentY > threshold) {
-            targetY = 610;
-            targetX = 250;
+          if (initialY === 90 && currentY > threshold) {
+            targetY = 710;
+            targetX = 240;
             targetHeight = 90;
             targetWidth = 160;
           }
           // Anivmation up values
-          if (!tapGesture && initialY === 610 && currentY < initialY - threshold) {
-            // console.log("currentY", currentY, "initialY", initialY, "gestureState.dy", gestureState.dy, "panY", panY._value);
-            targetY = 0;
+          if (!tapGesture && initialY === 710 && currentY < initialY - threshold) {
+            //  console.log("currentY", currentY, "initialY", initialY, "gestureState.dy", gestureState.dy, "panY", (panY as any)._value);
+            targetY = 90;
             targetX = 0;
             targetHeight = windowHeight;
             targetWidth = windowWidth;
@@ -267,13 +273,15 @@ export default function  MediaPlayer( {url} ) {
           // if the block is at the bottom, set the flag to true
           if (targetY >= 500) { 
             isBottom.current = true;
+            setTimeout(() => {
             setIsAtBottom(true);
+            },300);
           } else {
             isBottom.current = false;
             setIsAtBottom(false);
           }
   
-          if (initialY === 0 && currentY > threshold) {
+          if (initialY === 90 && currentY > threshold) {
             Animated.timing(listOpacity, {
               toValue: 0,
               duration: 300,
@@ -316,13 +324,13 @@ export default function  MediaPlayer( {url} ) {
     useEffect(() => {
         if (url !== null) {
             panX.setValue(0);
-            panY.setValue(0);
+            panY.setValue(90);
             boxHeight.setValue(windowHeight);
             boxWidth.setValue(windowWidth);
             opacity.setValue(1);
             listOpacity.setValue(1);
             isBottom.current = false;
-            initialVals.current = { x: 0, y: 0, height: windowHeight, width: windowWidth };
+            initialVals.current = { x: 0, y: 90, height: windowHeight, width: windowWidth };
         }
         }, [url]);
 
@@ -356,11 +364,16 @@ export default function  MediaPlayer( {url} ) {
 
         const handleLoop = async () => {
           console.log("loop");
+          if(loopState === 2) {
+            setLoopState(0);
+            return;
+          }
+          setLoopState(loopState + 1);
         }
 
         const handleFullScreen = async () => {
           goFullscreen();
-          setIsFullscreen(!isFullscreen);
+          setIsFullScreen(!isFullScreen);
 
         }
 
@@ -398,18 +411,17 @@ export default function  MediaPlayer( {url} ) {
                 alignItems: 'flex-start',
               }}
             >
-          <View {...panResponder.panHandlers} style={{ width: '100%', height: '26%',minHeight: 100, zIndex: 1}}  pointerEvents={isBottom.current ? "none" : "auto"}>
+          <View {...panResponder.panHandlers} style={{ width: '100%', height: '29%',minHeight: 100, zIndex: 1}}>
             <Video
               ref={videoRef}
               source={{ uri: url }}
               rate={1.0}
               volume={1.0}
-              isMuted={false}
+              isMuted={isMuted}
               resizeMode={videoResizeMode}
               shouldPlay={isPlaying}
               isLooping
-              style={{ width: "100%", height: "100%", minHeight: 100, }}
-              aspectRatio={16/9}
+              style={{ width: "100%", height: "100%", minHeight: 100,}}
               pointerEvents="none"
             />
             {
@@ -426,16 +438,20 @@ export default function  MediaPlayer( {url} ) {
               isPlaying={isPlaying}
               isMuted={isMuted}
               loopState={loopState}
-              isFullscreen={isFullscreen}
+              isFullScreen={isFullScreen}
             />
           }
           </View >
-          <Animated.View style={{ width: '100%', height: '74%', backgroundColor: 'white', opacity: listOpacity}} >
-            <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'green', maxHeight: "20%"  }}  placeholder='caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3 caca1 caca2 caca3'/>
-            <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'brown', maxHeight: "20%" }} placeholder='caca1 caca2 caca3'/>
-            <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'yellow', maxHeight: "20%" }} placeholder='caca1 caca2 caca3'/>
-            <TextInput style={{ width: '100%', height: '20%', backgroundColor: 'pink', maxHeight: "20%" }} placeholder='caca1 caca2 caca3'/>
+          {
+            !isAtBottom &&
+            <Animated.View style={{ width: '100%', height: '71%',backgroundColor:"red" ,opacity: listOpacity}} >
+            <View style={{ width: '100%', height: '20%', backgroundColor: 'green', maxHeight: "20%"  }} />
+            <View style={{ width: '100%', height: '20%', backgroundColor: 'brown', maxHeight: "20%" }} />
+            <View style={{ width: '100%', height: '20%', backgroundColor: 'yellow', maxHeight: "20%" }} />
+            <View style={{ width: '100%', height: '20%', backgroundColor: 'pink', maxHeight: "20%" }} />
           </Animated.View>
+          }
+          
 
         </Animated.View>
     );

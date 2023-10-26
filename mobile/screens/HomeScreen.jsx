@@ -7,11 +7,11 @@ import { EventRegister } from 'react-native-event-listeners';
 import FileThumbnail from '../components/FileThumnail';
 import MediaPlayer from '../components/MediaPlayer';
 
-export default function  PromotionsScreen() {
+export default function  HomeScreen({ setSelectedUrl }) {
   const [mediaFiles, setMediaFiles] = useState([]);
   const [sound, setSound] = useState(null);
   const [data, setData] = useState([])
-  const [selectedUrl, setSelectedUrl] = useState(null);
+  // const [selectedUrl, setSelectedUrl] = useState(null);
 
 
 
@@ -62,12 +62,12 @@ export default function  PromotionsScreen() {
               </View>
             </ScrollView>
 
-            {selectedUrl && 
+            {/* {selectedUrl && 
               <MediaPlayer
                 url={selectedUrl}
                 onClose={() => setSelectedUrl(null)}
               />
-          }
+          } */}
         </SafeAreaView>
     );
 }

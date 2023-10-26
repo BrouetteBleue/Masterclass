@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import BottomTab from './components/BottomTab';
+import WrapperComponent from './components/WrapperComponent';
 
 export default function App() {
   
@@ -11,7 +12,7 @@ export default function App() {
     <SafeAreaProvider>
       <NavigationContainer>
           <StatusBar style="auto" />
-          <BottomTab />
+          <WrapperComponent />
       </NavigationContainer>
     </SafeAreaProvider>
   );
