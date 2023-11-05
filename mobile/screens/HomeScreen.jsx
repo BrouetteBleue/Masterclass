@@ -13,9 +13,31 @@ export default function  HomeScreen({ setSelectedUrl }) {
   const [data, setData] = useState([])
   // const [selectedUrl, setSelectedUrl] = useState(null);
 
+  const createDirectory = async () => {
+    const dir = FileSystem.documentDirectory + 'my_videos/';
+    const info = await FileSystem.getInfoAsync(dir);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(dir);
+    }
+  };
 
+  // debug function
+  const logFiles = async () => {
+    try {
+      const dirUri = FileSystem.documentDirectory;
+      const files = await FileSystem.readDirectoryAsync(dirUri);
+      console.log('Files in Document Directory:');
+      files.forEach((fileName, index) => {
+        console.log(`${index + 1}. ${fileName}`);
+      });
+    } catch (error) {
+      console.error('Error reading document directory:', error);
+    }
+  };
 
     useEffect(() => {
+      createDirectory();
+      logFiles();
 
       // FETCH
       const fetchFiles = async () => {

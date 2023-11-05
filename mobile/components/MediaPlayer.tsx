@@ -15,6 +15,9 @@ interface MediaPlayerProps {
 
 export default function  MediaPlayer( {url, onClose}: MediaPlayerProps) {
 
+  console.log("url", url);
+  
+
     const [mediaFiles, setMediaFiles] = useState([]);
     const [sound, setSound] = useState(null);
     const [data, setData] = useState([])
