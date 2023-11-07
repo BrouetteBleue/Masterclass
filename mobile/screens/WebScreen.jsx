@@ -9,25 +9,14 @@ import { debounce } from 'lodash';
 
 
 export default function WebScreen() {
-  const [uri, setUri] = useState('https://m.youtube.com/');
+  const [uri, setUri] = useState('https://m.soundcloud.com/');
   const [textInputValue, setTextInputValue] = useState('');
   const webViewRef = useRef(null);
   const [prevUrl, setPrevUrl] = useState('');
   const [isMessageProcessing, setIsMessageProcessing] = useState(false);
 
-  useEffect(() => {
-    const db = SQLite.openDatabase('files.db');
 
-    db.transaction(tx => {
-      tx.executeSql(
-        "CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, url TEXT, date DATE, duration TEXT, size TEXT, extension TEXT);"
-      );
-      console.log('Table created');
-    });
-  }, []);
-
-
-  const convertMedia = async (uri, name) => {
+  const convertMedia = async (uri, name,cleanedTitle) => {
     try {
       console.log("URI:", uri);
       const extension = uri.split('.').pop();
@@ -51,8 +40,8 @@ export default function WebScreen() {
     
       db.transaction(tx => {
         tx.executeSql(
-          "INSERT INTO files (name, url, date, size, extension) VALUES (?, ?, ?, ?, ?);",
-          [name, uri, date, size.size, extension]
+          "INSERT INTO files (name, path, date, duration, size, extension) VALUES (?, ?, ?, ?, ?, ?);",
+          [name, cleanedTitle, date, duration, size.size, extension]
         );
         console.log('File inserted');
       });
@@ -105,7 +94,7 @@ export default function WebScreen() {
                 await FileSystem.writeAsStringAsync(fileUri, base64data, {
                   encoding: FileSystem.EncodingType.Base64,
                 });
-                convertMedia(fileUri, data.title);
+                convertMedia(fileUri, data.title, cleanedTitle+'.mp3');
               };
               reader.readAsDataURL(blob);
               console.log(`Fichier téléchargé et sauvegardé à ${fileUri}`);
@@ -124,7 +113,7 @@ export default function WebScreen() {
                 const { uri: downloadedUrl } = await download.downloadAsync();
                 console.log(`Fichier téléchargé et sauvegardé à ${downloadedUrl}`);
                 
-                convertMedia(downloadedUrl, data.title);
+                convertMedia(downloadedUrl, data.title, cleanedTitle+'.mp4');
                 setIsMessageProcessing(false);
               } catch (error) {
                 console.log(`Erreur: ${error}`);

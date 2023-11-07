@@ -8,14 +8,15 @@ import MediaPlayerControl, { LoopState } from './MediaPlayerControl';
 
 
 interface MediaPlayerProps {
-    url: string;
+    uri: string;
     onClose: () => void;
   }
 
 
-export default function  MediaPlayer( {url, onClose}: MediaPlayerProps) {
+export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
 
-  console.log("url", url);
+  const filePath = `${FileSystem.documentDirectory}${uri}`;
+  console.log("url", uri);
   
 
     const [mediaFiles, setMediaFiles] = useState([]);
@@ -325,7 +326,7 @@ export default function  MediaPlayer( {url, onClose}: MediaPlayerProps) {
 
     // reset animation values when a new video is selected
     useEffect(() => {
-        if (url !== null) {
+        if (uri !== null) {
             panX.setValue(0);
             panY.setValue(90);
             boxHeight.setValue(windowHeight);
@@ -335,7 +336,7 @@ export default function  MediaPlayer( {url, onClose}: MediaPlayerProps) {
             isBottom.current = false;
             initialVals.current = { x: 0, y: 90, height: windowHeight, width: windowWidth };
         }
-        }, [url]);
+        }, [uri]);
 
         const close = () => {
           EventRegister.emit('closeMediaPlayer', true);
@@ -397,7 +398,7 @@ export default function  MediaPlayer( {url, onClose}: MediaPlayerProps) {
 
         useEffect(() => {
           hideMediaControl();
-        }, [url]);
+        }, [uri]);
 
 
     return (
@@ -417,7 +418,7 @@ export default function  MediaPlayer( {url, onClose}: MediaPlayerProps) {
           <View {...panResponder.panHandlers} style={{ width: '100%', height: '29%',minHeight: 100, zIndex: 1}}>
             <Video
               ref={videoRef}
-              source={{ uri: url }}
+              source={{ uri: uri }}
               rate={1.0}
               volume={1.0}
               isMuted={isMuted}

@@ -13,14 +13,6 @@ export default function  HomeScreen({ setSelectedUrl }) {
   const [data, setData] = useState([])
   // const [selectedUrl, setSelectedUrl] = useState(null);
 
-  const createDirectory = async () => {
-    const dir = FileSystem.documentDirectory + 'my_videos/';
-    const info = await FileSystem.getInfoAsync(dir);
-    if (!info.exists) {
-      await FileSystem.makeDirectoryAsync(dir);
-    }
-  };
-
   // debug function
   const logFiles = async () => {
     try {
@@ -36,7 +28,7 @@ export default function  HomeScreen({ setSelectedUrl }) {
   };
 
     useEffect(() => {
-      createDirectory();
+      // createDirectory();
       logFiles();
 
       // FETCH
@@ -54,10 +46,12 @@ export default function  HomeScreen({ setSelectedUrl }) {
       const db = SQLite.openDatabase('files.db');
 
       db.transaction(tx => {
-        tx.executeSql("SELECT * FROM files WHERE extension = 'mp4';", [], (tx, results) => {
-          console.log(results.rows._array);
+        tx.executeSql("SELECT * FROM files", [], (tx, results) => {
+          
           setData(results.rows._array);
-
+          data.map((item) => {
+            console.log(item);
+          })
         });
       });
 
