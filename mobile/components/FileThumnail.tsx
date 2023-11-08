@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Pressable, Image ,TextInput, Button, Alert, FlatList, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, Pressable, Image} from 'react-native';
 import React, { useState, useEffect, useRef } from 'react';
 import * as Thumb from 'expo-video-thumbnails';
 import PlayBtn from '../assets/PlayBtn';
@@ -9,7 +9,12 @@ export default function  FileThumbnail({ data , onSelect}): JSX.Element {
 
     const [thumbnail, setThumbnail] = useState(null);
     const handleClick = () => {
-      onSelect(FileSystem.documentDirectory+data.path);
+      if (data.extension) {
+        onSelect(FileSystem.documentDirectory+data.path);
+      }else{
+        onSelect(data.path);
+      }
+      
     };
 
     

@@ -3,18 +3,22 @@ import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native';
 import BottomTab from './BottomTab';
 import MediaPlayer from './MediaPlayer';
+import {useCurrentUrl } from '../hooks/useCurrentUrl';
+import { NavigationProvider } from '../hooks/useHeaderContext';
 
 const WrapperComponent = () => {
-  const [selectedUrl, setSelectedUrl] = useState(null);
+  const { currentUrl, setCurrentUrl } = useCurrentUrl();
 
   return (
     <>
-      <BottomTab setSelectedUrl={setSelectedUrl} /> 
+      <NavigationProvider>
+        <BottomTab /> 
+      </NavigationProvider> 
       <SafeAreaView style={{flex:1, position:"absolute", top:0, left: 0}}>
-          {selectedUrl && (
+          {currentUrl && (
           <MediaPlayer
-            uri={selectedUrl}
-            onClose={() => setSelectedUrl(null)}
+            uri={currentUrl}
+            onClose={() => setCurrentUrl(null)}
           />
         )}
       

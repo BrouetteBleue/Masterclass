@@ -5,6 +5,8 @@ import { StatusBar } from "expo-status-bar";
 import WrapperComponent from './components/WrapperComponent';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createDatabase } from './functions/create';
+import { CurrentUrlProvider } from './hooks/useCurrentUrl';
+
 
 export default function App() {
   
@@ -31,7 +33,9 @@ export default function App() {
     <SafeAreaProvider>
       <NavigationContainer>
           <StatusBar style="auto" />
-          <WrapperComponent />
+          <CurrentUrlProvider> 
+            <WrapperComponent />
+          </CurrentUrlProvider>
       </NavigationContainer>
     </SafeAreaProvider>
   );

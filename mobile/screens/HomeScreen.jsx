@@ -1,17 +1,55 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, Animated, PanResponder, TextInput, Button, Alert, FlatList, SafeAreaView , Dimensions} from 'react-native';
-import React, { useState, useEffect, useRef } from 'react';
-import { Video , Audio } from 'expo-av';
+import { StyleSheet, Text, View, Pressable, ScrollView, SafeAreaView} from 'react-native';
+import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import * as FileSystem from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import { EventRegister } from 'react-native-event-listeners';
 import FileThumbnail from '../components/FileThumnail';
-import MediaPlayer from '../components/MediaPlayer';
+import { createStackNavigator } from '@react-navigation/stack';
+import { useCurrentUrl } from '../hooks/useCurrentUrl';
+import { useNavigationContext } from '../hooks/useHeaderContext';
+import { useFocusEffect } from '@react-navigation/native';
 
-export default function  HomeScreen({ setSelectedUrl }) {
-  const [mediaFiles, setMediaFiles] = useState([]);
-  const [sound, setSound] = useState(null);
+const Stack = createStackNavigator();
+
+export const FileExplorerStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{
+          headerShown: false,
+        }}>
+      <Stack.Screen
+        name="FileExplorer"
+        component={HomeScreen}
+        initialParams={{ folderPath: FileSystem.documentDirectory }} // define root folder
+        
+      />
+    </Stack.Navigator>
+  );
+};
+
+
+const HomeScreen = ({ route, navigation }) => {
+  const { folderPath } = route.params;
+  const { setCurrentUrl } = useCurrentUrl();
+  const { setCurrentTitle, setCanGoBack } = useNavigationContext();
+
+  const handleFolderPress = (subFolderName) => {
+    const subFolderPath = `${folderPath}${subFolderName}`; 
+    setCurrentTitle(subFolderName);
+    setCanGoBack(true);
+    navigation.push('FileExplorer', { folderPath: subFolderPath, title: subFolderName.slice(0, -1) }); 
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      const route = navigation.getState().routes[navigation.getState().index];
+      setCurrentTitle(route.params?.title || 'Home'); // set title
+      // determine if back button should be shown
+      setCanGoBack(navigation.getState().index > 0);
+      console.log(route.params?.folderPath);
+    }, [navigation])
+  );
+
   const [data, setData] = useState([])
-  // const [selectedUrl, setSelectedUrl] = useState(null);
 
   // debug function
   const logFiles = async () => {
@@ -28,18 +66,8 @@ export default function  HomeScreen({ setSelectedUrl }) {
   };
 
     useEffect(() => {
-      // createDirectory();
+
       logFiles();
-
-      // FETCH
-      const fetchFiles = async () => {
-        const dir = FileSystem.documentDirectory;
-        const files = await FileSystem.readDirectoryAsync(dir);
-        setMediaFiles(files.filter(file => file.endsWith('.mp4') || file.endsWith('.mp3')));
-      };
-
-      fetchFiles();
-
 
       // DATABASE
 
@@ -58,29 +86,14 @@ export default function  HomeScreen({ setSelectedUrl }) {
       // LISTENER
       const listener = EventRegister.addEventListener('closeMediaPlayer', (data) => {
         console.log(data);
-        setSelectedUrl(null);
+        setCurrentUrl(null);
       });
       return () => {
         EventRegister.removeEventListener(listener);
       }
     }, []);
 
-  
-    return (
-        <SafeAreaView>
-            <ScrollView style={{minHeight:"100%",backgroundColor: '#fff',}}>
-              <View style={styles.container} >
-                {data.map((item) => (
-                  <React.Fragment key={item.id}>
-                  <FileThumbnail data={item} onSelect={(url) => setSelectedUrl(url)} />
-                  </React.Fragment>
-                ))}
-              </View>
-            </ScrollView>
-        </SafeAreaView>
-    );
-}
-const styles = StyleSheet.create({
+  const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
     alignItems: 'center',
@@ -92,4 +105,22 @@ const styles = StyleSheet.create({
     height: '100%',
     minHeight:"100%"
   },
+  // ...
 });
+    return (
+        <SafeAreaView>
+            <ScrollView style={{minHeight:"100%",backgroundColor: '#fff',}}>
+              <View style={styles.container} >
+                {data.map((item) => (
+                  <React.Fragment key={item.id}>
+                    {item.extension ? 
+                      <FileThumbnail data={item} onSelect={(url) => setCurrentUrl(url)} />
+                     : <FileThumbnail data={item} onSelect={(url) => handleFolderPress(url)} /> }
+                  
+                  </React.Fragment>
+                ))}
+              </View>
+            </ScrollView>
+        </SafeAreaView>
+    );
+}

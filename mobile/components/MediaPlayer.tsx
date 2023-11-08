@@ -208,6 +208,7 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
                 useNativeDriver: false,
               }),
             ]).start(() => {
+              EventRegister.removeAllListeners();
               close() // reset the selected video url
           
             });
@@ -324,6 +325,7 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
       })
     ).current;
 
+
     // reset animation values when a new video is selected
     useEffect(() => {
         if (uri !== null) {
@@ -335,7 +337,8 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
             listOpacity.setValue(1);
             isBottom.current = false;
             initialVals.current = { x: 0, y: 90, height: windowHeight, width: windowWidth };
-        }
+            setIsAtBottom(false);
+          }
         }, [uri]);
 
         const close = () => {
@@ -425,7 +428,7 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
               resizeMode={videoResizeMode}
               shouldPlay={isPlaying}
               isLooping
-              style={{ width: "100%", height: "100%", minHeight: 100,}}
+              style={{ width: "100%", height: "100%", minHeight: 100, backgroundColor: 'black'}}
               pointerEvents="none"
             />
             {

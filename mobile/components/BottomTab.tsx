@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, } from 'react';
 import { View, Text, Pressable, TouchableOpacity, StyleSheet,Dimensions, TextInput } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import * as FileSystem from 'expo-file-system';
-import HomeScreen from '../screens/HomeScreen';
+import { useNavigation } from '@react-navigation/native';
+import { FileExplorerStack } from '../screens/HomeScreen';
 import WebScreen from '../screens/WebScreen';
 import PlayerBtn from './Buttons/PlayerBtn';
 import createFolder from '../functions/create';
+import { useNavigationContext } from '../hooks/useHeaderContext';
+
 const screenHeight = Dimensions.get('screen').height;
 
 type RootTabParamList = {
@@ -13,6 +15,13 @@ type RootTabParamList = {
     Profile: String;
     Settings: String;
 };
+
+type RootStackParamList = {
+    Home: { title?: string };
+    Profile: undefined;
+    Settings: undefined;
+    // ajoutez d'autres routes avec leurs paramètres ici
+  };
 
 interface MenuOptionProps {
     label: string;
@@ -125,9 +134,12 @@ const ModalCreateDirectory = ({onClose}) => {
   };
 
 
-export const BottomTab = ({ setSelectedUrl }) => {
+export const BottomTab = () => {
     const [menuVisible, setMenuVisible] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
+    // const { currentTitle , setCurrentTitle } = useCurrentTitle();
+    const { currentTitle, canGoBack, setCurrentTitle } = useNavigationContext();
+    const navigation = useNavigation();
 
     const closeAll = () => {
         setModalVisible(false);
@@ -139,15 +151,18 @@ export const BottomTab = ({ setSelectedUrl }) => {
         <Tab.Navigator>
             <Tab.Screen 
                 name="Home" 
-                options={{ 
-                    title: 'My home',
+                options={({ navigation }) => ({
+
+                    title: currentTitle,
+                    headerLeft: () => canGoBack && <BackButton navigation={navigation} />,
                     headerRight: () => (
                         <HeaderButton onOpen={() => setMenuVisible(true)} />
                     ),
-                }}
-            >
-                {props => <HomeScreen {...props} setSelectedUrl={setSelectedUrl} />}
-            </Tab.Screen>
+                })}
+                component={FileExplorerStack}
+            />
+    
+            {/* </Tab.Screen> */}
             <Tab.Screen name="Profile" component={WebScreen} />
             <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
@@ -157,6 +172,18 @@ export const BottomTab = ({ setSelectedUrl }) => {
        
     );
 };
+
+const BackButton = ({ navigation }) => {
+
+    return (
+
+        <Pressable onPress={() => navigation.goBack()}>
+          {/* Ici, mettez l'icône ou le texte de votre bouton de retour */}
+            <Text style={{color:"red"}}>Back</Text>
+        </Pressable>
+
+    );
+  };
  
 
 const SettingsScreen = () => {
