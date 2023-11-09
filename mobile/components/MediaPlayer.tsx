@@ -15,10 +15,6 @@ interface MediaPlayerProps {
 
 export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
 
-  const filePath = `${FileSystem.documentDirectory}${uri}`;
-  console.log("url", uri);
-  
-
     const [mediaFiles, setMediaFiles] = useState([]);
     const [sound, setSound] = useState(null);
     const [data, setData] = useState([])
@@ -76,12 +72,9 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
       targetY = Math.min(Math.max(targetY, 90), 710); // position for iphone 11
       targetX = Math.min(Math.max(targetX, 0), 240); 
   
-      if (newHeight >= windowHeight) {
-        console.log("contain");
-        
+      if (newHeight >= windowHeight) {   
         setVideoResizeMode(ResizeMode.CONTAIN);
       } else {
-        console.log("cover");
         setVideoResizeMode(ResizeMode.COVER)
       }
   
@@ -131,15 +124,14 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
     const panResponder = useRef(
       PanResponder.create({
         onStartShouldSetPanResponder: () => {
-          console.log("onStartShouldSetPanResponder");
+          // console.log("onStartShouldSetPanResponder");
           tapGesture = true; // if the user touches the block, it's a tap gesture
           setIsMediaControlVisible(false);     
           return true;
         },
         onMoveShouldSetPanResponder: () => {
-          console.log("onMoveShouldSetPanResponder");
+          // console.log("onMoveShouldSetPanResponder");
           tapGesture = false; // if the user moves the block, it's a drag gesture, not a tap
-          console.log("tapGesture", tapGesture);
           setIsMediaControlVisible(false);     
           return true;
         },
@@ -208,9 +200,8 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
                 useNativeDriver: false,
               }),
             ]).start(() => {
-              EventRegister.removeAllListeners();
               close() // reset the selected video url
-          
+              EventRegister.removeAllListeners();
             });
             return;
           }
@@ -328,6 +319,7 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
 
     // reset animation values when a new video is selected
     useEffect(() => {
+      console.log("url", uri);
         if (uri !== null) {
             panX.setValue(0);
             panY.setValue(90);
@@ -342,6 +334,8 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
         }, [uri]);
 
         const close = () => {
+          console.log("close");
+          
           EventRegister.emit('closeMediaPlayer', true);
         }
 

@@ -6,6 +6,7 @@ import * as FileSystem from 'expo-file-system';
 import { Video , Audio } from 'expo-av';
 import * as SQLite from 'expo-sqlite';
 import { debounce } from 'lodash';
+import { insertFile } from '../functions/create';
 
 
 export default function WebScreen() {
@@ -37,14 +38,23 @@ export default function WebScreen() {
     
       console.log("Ouverture de la base de données...");
       const db = SQLite.openDatabase('files.db');
-    
-      db.transaction(tx => {
-        tx.executeSql(
-          "INSERT INTO files (name, path, date, duration, size, extension) VALUES (?, ?, ?, ?, ?, ?);",
-          [name, cleanedTitle, date, duration, size.size, extension]
-        );
-        console.log('File inserted');
+
+      const data = {
+        name: name,
+        file_name: cleanedTitle,
+        folder_id: null,
+        date: date,
+        duration: duration,
+        size: size.size,
+        extension: extension
+      }
+
+      insertFile(data).then((caca) => {
+        console.log("Fichier inséré");
+      }).catch((error) => {
+        console.log("Erreur lors de l'insertion du fichier:", error);
       });
+      
     } catch (error) {
       console.error("Erreur :", error);
     }
@@ -117,7 +127,6 @@ export default function WebScreen() {
                 setIsMessageProcessing(false);
               } catch (error) {
                 console.log(`Erreur: ${error}`);
-                // Ajouter ici une logique pour gérer l'erreur
               }
             }
           };
@@ -463,9 +472,3 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
-
-
-
-
-// quand il cherche un site il écrits => sa l'envoie sur google avec la recherche qu'il a écris
-

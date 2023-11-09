@@ -10,9 +10,16 @@ export default function  FileThumbnail({ data , onSelect}): JSX.Element {
     const [thumbnail, setThumbnail] = useState(null);
     const handleClick = () => {
       if (data.extension) {
-        onSelect(FileSystem.documentDirectory+data.path);
+        let path :string;
+        if(data.folder_id){
+          path = data.path+data.file_name;
+        }else {
+          path = FileSystem.documentDirectory+data.file_name;
+        }
+
+        onSelect(path); 
       }else{
-        onSelect(data.path);
+        onSelect(data.id,data.name);
       }
       
     };
@@ -33,8 +40,6 @@ export default function  FileThumbnail({ data , onSelect}): JSX.Element {
     };
 
     useEffect(() => {
-        console.log("test" +data);
-
           switch (data.extension) {
             case "mp4":
               fetchThumbnail();
@@ -42,7 +47,7 @@ export default function  FileThumbnail({ data , onSelect}): JSX.Element {
             case "mp3":
               setThumbnail(require('../assets/music.png'));
               break;
-            case null:
+            case undefined:
               setThumbnail(require('../assets/folder.png'));
               break;
             // case "pdf":

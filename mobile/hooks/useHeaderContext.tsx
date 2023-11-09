@@ -3,8 +3,10 @@ import { useState, useCallback, useContext, createContext, useEffect } from 'rea
 const NavigationContext = createContext({
     currentTitle: "Home",
     canGoBack: false,
+    folderId: null,
     setCurrentTitle: (title: string) => {},
-    setCanGoBack: (canGoBack: boolean) => {}
+    setCanGoBack: (canGoBack: boolean) => {},
+    setFolderId: (folderId: number) => {}
   });
   
   export const useNavigationContext = () => {
@@ -14,6 +16,7 @@ const NavigationContext = createContext({
   export const NavigationProvider = ({ children }) => {
     const [currentTitle, setCurrentTitle] = useState("Home");
     const [canGoBack, setCanGoBack] = useState(false);
+    const [folderId, setFolderId] = useState(null);
 
     const handleSetCurrentTitle = useCallback((title: string) => {
       setCurrentTitle(title);
@@ -22,13 +25,19 @@ const NavigationContext = createContext({
     const handleSetCanGoBack = useCallback((canGoBack: boolean) => {
       setCanGoBack(canGoBack);
     }, []);
+
+    const handleSetFolderId = useCallback((folderId: number) => {
+      setFolderId(folderId);
+    }, []);
   
     return (
       <NavigationContext.Provider value={{
         currentTitle,
         canGoBack,
+        folderId,
         setCurrentTitle: handleSetCurrentTitle,
-        setCanGoBack: handleSetCanGoBack
+        setCanGoBack: handleSetCanGoBack,
+        setFolderId: handleSetFolderId
       }}>
         {children}
       </NavigationContext.Provider>

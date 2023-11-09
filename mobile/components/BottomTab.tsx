@@ -16,13 +16,6 @@ type RootTabParamList = {
     Settings: String;
 };
 
-type RootStackParamList = {
-    Home: { title?: string };
-    Profile: undefined;
-    Settings: undefined;
-    // ajoutez d'autres routes avec leurs paramètres ici
-  };
-
 interface MenuOptionProps {
     label: string;
     onPress: () => void;
@@ -87,6 +80,7 @@ const MenuOverlay = ({ visible, onClose, createFolder }: MenuOverlayProps) => {
 
 const ModalCreateDirectory = ({onClose}) => {
 
+    const { folderId } = useNavigationContext();
     const [folderName, setFolderName] = useState('');
     // autofocus on input
     const inputRef = useRef(null);
@@ -99,7 +93,7 @@ const ModalCreateDirectory = ({onClose}) => {
     // async function to handle Create button cause onPress can't be a promise
     const handleCreatePress = async () => {
         try {
-            await createFolder(folderName.trim());
+            await createFolder(folderName.trim(), folderId || null);
             // if good close modal
             onClose();
         } catch (error) {

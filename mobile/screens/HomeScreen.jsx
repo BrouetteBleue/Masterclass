@@ -8,6 +8,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { useCurrentUrl } from '../hooks/useCurrentUrl';
 import { useNavigationContext } from '../hooks/useHeaderContext';
 import { useFocusEffect } from '@react-navigation/native';
+import { fetchFiles } from '../functions/read';
 
 const Stack = createStackNavigator();
 
@@ -28,23 +29,40 @@ export const FileExplorerStack = () => {
 
 
 const HomeScreen = ({ route, navigation }) => {
-  const { folderPath } = route.params;
-  const { setCurrentUrl } = useCurrentUrl();
-  const { setCurrentTitle, setCanGoBack } = useNavigationContext();
+  const { setCurrentUrl, currentUrl } = useCurrentUrl();
+  const { setCurrentTitle, setCanGoBack, setFolderId, canGoBack, folderId } = useNavigationContext();
 
-  const handleFolderPress = (subFolderName) => {
-    const subFolderPath = `${folderPath}${subFolderName}`; 
+  const handleFolderPress = (id,subFolderName) => {
     setCurrentTitle(subFolderName);
     setCanGoBack(true);
-    navigation.push('FileExplorer', { folderPath: subFolderPath, title: subFolderName.slice(0, -1) }); 
+    setFolderId(id);
+    navigation.push('FileExplorer', { folder: id, title: subFolderName }); 
   };
+
+  const handleFilePress = (url) => {
+    setCurrentUrl(url);
+    console.log("AAAAAAAAAA"+currentUrl);
+    console.log(url);
+  }
 
   useFocusEffect(
     useCallback(() => {
       const route = navigation.getState().routes[navigation.getState().index];
       setCurrentTitle(route.params?.title || 'Home'); // set title
+      
       // determine if back button should be shown
-      setCanGoBack(navigation.getState().index > 0);
+      setCanGoBack(navigation.getState().index > 0); 
+      
+      fetchFiles(route.params?.folder || null).then((data) => {
+        data.map((item) => {
+          console.log("AAAAAAAAAA"+item.path);
+        })
+        setData(data)
+      }).catch((err) => {
+        console.log(err);
+      })
+
+      
       console.log(route.params?.folderPath);
     }, [navigation])
   );
@@ -69,23 +87,8 @@ const HomeScreen = ({ route, navigation }) => {
 
       logFiles();
 
-      // DATABASE
-
-      const db = SQLite.openDatabase('files.db');
-
-      db.transaction(tx => {
-        tx.executeSql("SELECT * FROM files", [], (tx, results) => {
-          
-          setData(results.rows._array);
-          data.map((item) => {
-            console.log(item);
-          })
-        });
-      });
-
       // LISTENER
       const listener = EventRegister.addEventListener('closeMediaPlayer', (data) => {
-        console.log(data);
         setCurrentUrl(null);
       });
       return () => {
@@ -109,18 +112,22 @@ const HomeScreen = ({ route, navigation }) => {
 });
     return (
         <SafeAreaView>
-            <ScrollView style={{minHeight:"100%",backgroundColor: '#fff',}}>
-              <View style={styles.container} >
-                {data.map((item) => (
-                  <React.Fragment key={item.id}>
+          <ScrollView style={{ minHeight: "100%", backgroundColor: '#fff', }}>
+            <View style={styles.container} >
+              {data.map((item) => {
+                // set composed key to avoid same id warning
+                const key = item.extension ? `file-${item.id}` : `folder-${item.id}`;
+                return (
+                  <React.Fragment key={key}>
                     {item.extension ? 
-                      <FileThumbnail data={item} onSelect={(url) => setCurrentUrl(url)} />
-                     : <FileThumbnail data={item} onSelect={(url) => handleFolderPress(url)} /> }
-                  
+                      <FileThumbnail data={item} onSelect={(url) => handleFilePress(url)} />
+                      : <FileThumbnail data={item} onSelect={(id, name) => handleFolderPress(id, name)} /> 
+                    }
                   </React.Fragment>
-                ))}
-              </View>
-            </ScrollView>
+                );
+              })}
+            </View>
+          </ScrollView>
         </SafeAreaView>
     );
 }
