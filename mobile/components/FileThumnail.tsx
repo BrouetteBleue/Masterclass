@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as Thumb from 'expo-video-thumbnails';
 import PlayBtn from '../assets/PlayBtn';
 import * as FileSystem from 'expo-file-system';
+import { getFolderInfo } from '../functions/read';
 
 
 export default function  FileThumbnail({ data , onSelect}): JSX.Element {
@@ -12,13 +13,17 @@ export default function  FileThumbnail({ data , onSelect}): JSX.Element {
       if (data.extension) {
         let path :string;
         if(data.folder_id){
-          path = data.path+data.file_name;
+          getFolderInfo(data.folder_id).then((data2) => {
+            path = data2.path+data.file_name; 
+            onSelect(path); 
+          })
         }else {
           path = FileSystem.documentDirectory+data.file_name;
+          onSelect(path); 
         }
-
-        onSelect(path); 
+        
       }else{
+        // if its a folder
         onSelect(data.id,data.name);
       }
       
@@ -27,13 +32,24 @@ export default function  FileThumbnail({ data , onSelect}): JSX.Element {
     
     const fetchThumbnail = async () => {
       try {
-        const thumb = await Thumb.getThumbnailAsync(
-          FileSystem.documentDirectory+data.path,
-          {
-            time: 15000,
-          }
-        );
-        setThumbnail({ uri: thumb.uri });
+        if(data.folder_id){
+          let path2 :string;
+          getFolderInfo(data.folder_id).then(async (data2) => {
+            path2 = data2.path;
+            const thumb = await Thumb.getThumbnailAsync(
+              path2+data.file_name,
+              {
+                time: 15000,
+              }
+            );
+            
+            setThumbnail({ uri: thumb.uri });
+          }).catch((error) => {
+            console.error(error);
+          })
+
+          
+        }
       } catch (error) {
         console.error('Erreur en récupérant la miniature:', error);
       }
@@ -114,7 +130,7 @@ export default function  FileThumbnail({ data , onSelect}): JSX.Element {
 
     return (
       <Pressable onPress={handleClick} style={{ width:"33%"}}>
-        <View style={{ backgroundColor: "#fff",  height: 120 , position: 'relative', alignItems: 'center', marginBottom: 50}}>
+        <View style={{ height: 120 , position: 'relative', alignItems: 'center', marginBottom: 50}}>
              {thumbnail && (
               <>
                 <Image
@@ -149,8 +165,6 @@ export default function  FileThumbnail({ data , onSelect}): JSX.Element {
                 <Text>{data.date}</Text>
               </>
             )}
-            
-      
         </View>    
       </Pressable>
         

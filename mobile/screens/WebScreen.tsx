@@ -1,68 +1,171 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput, Button, Alert, FlatList } from 'react-native';
+import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput,Button, Modal, Alert, FlatList, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system';
+import { Linking, NativeModules } from 'react-native';
 import { Video , Audio } from 'expo-av';
 import * as SQLite from 'expo-sqlite';
 import { debounce } from 'lodash';
 import { insertFile } from '../functions/create';
+import { fetchFiles, getFolderInfo } from '../functions/read';
+import FileThumbnail from '../components/FileThumnail';
+import PlayerBtn from '../components/Buttons/PlayerBtn';
 
 
 export default function WebScreen() {
-  const [uri, setUri] = useState('https://m.soundcloud.com/');
+  const [uri, setUri] = useState('https://m.youtube.com/');
   const [textInputValue, setTextInputValue] = useState('');
   const webViewRef = useRef(null);
   const [prevUrl, setPrevUrl] = useState('');
   const [isMessageProcessing, setIsMessageProcessing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [directoryModalVisible, setDirectoryModalVisible] = useState(false);
+  const windowWidth = Dimensions.get('window').width;
+  const windowHeight = Dimensions.get('window').height -90;
+  const [currentFolder, setCurrentFolder] = useState({
+    id: null,
+    name: null,
+    parentId: null,
+    path: null
+  });
+  const [folders, setFolders] = useState([]);
+  const [mediaInfos, setMediaInfos] = useState({url: '', title: ''});
+  const [pendingUrl, setPendingUrl] = useState(null);
+  const { WebViewBridge } = NativeModules;
+
+
+  const loadFolders = async (folderId) => {
+    const fetchedFolders = await fetchFiles(folderId, "folders");
+    setFolders(fetchedFolders);
+
+    console.log("Dossier actuel:", currentFolder);
+    
+  };
+
+  const handleFolderClick = async (folderId) => {
+    const folderInfo = await getFolderInfo(folderId);
+    setCurrentFolder({ id: folderId, parentId: folderInfo.parent_id, name: folderInfo.name, path: folderInfo.path });
+    await loadFolders(folderId);
+  };
+
+  const handleBackClick = async () => {
+    if (currentFolder.parentId !== null) {
+      const parentFolderInfo = await getFolderInfo(currentFolder.parentId);
+      setCurrentFolder({ id: parentFolderInfo.id, parentId: parentFolderInfo.parent_id, name: parentFolderInfo.name, path: parentFolderInfo.path });
+      await loadFolders(parentFolderInfo.id);
+    } else {
+      setCurrentFolder({ id: null, parentId: null, name: "Racine", path: FileSystem.documentDirectory });
+      await loadFolders(null);
+    }
+  };
+  
+  useEffect(() => {
+    if (directoryModalVisible) {
+      loadFolders(currentFolder.id);
+    }
+  }, [directoryModalVisible, currentFolder.id]);
+
+
+  const closeWebViewTransaction = () => {
+    setDirectoryModalVisible(false);
+    setModalVisible(false);
+    setIsMessageProcessing(false);
+  }
+
+  const handleDownload = async (url) => {
+    console.log("Téléchargement du média" + url);
+
+    const cleanedTitle = mediaInfos.title.replace(/[^a-zA-Z0-9]/g, '');
+    let directory = currentFolder.path || FileSystem.documentDirectory;
+    const extension = uri.includes('soundcloud') ? '.mp3' : '.mp4';
+    let fileUri = `${directory}${cleanedTitle}${extension}`;
+
+    // verify if file already exists
+    let counter = 1;
+    while (await FileSystem.getInfoAsync(fileUri).then(info => info.exists)) {
+      fileUri = `${directory}${cleanedTitle}(${counter})${extension}`;
+      counter++;
+    }
+
+
+    if(uri.includes('soundcloud')){
+      const url = `http://192.168.1.34:3000/convert?url=${encodeURIComponent(mediaInfos.url)}&title=${cleanedTitle}`;
+      const response = await fetch(url);
+      const blob = await response.blob();
+      
+      const reader = new FileReader();
+      reader.onload = async function() {
+        if (typeof reader.result === 'string') {
+          const base64data = reader.result.split(',')[1];
+          await FileSystem.writeAsStringAsync(fileUri, base64data, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          convertMedia(fileUri, mediaInfos.title, cleanedTitle+'.mp3');
+        } 
+      };
+      reader.readAsDataURL(blob);
+      console.log(`Fichier téléchargé et sauvegardé à ${fileUri}`);
+      
+      closeWebViewTransaction();
+    }
+    else {
+      try {
+        const download = FileSystem.createDownloadResumable(mediaInfos.url, fileUri);
+        const { uri: downloadedUrl } = await download.downloadAsync();
+        console.log(`Fichier téléchargé et sauvegardé à ${downloadedUrl}`);
+        
+        convertMedia(downloadedUrl, mediaInfos.title, cleanedTitle+'.mp4');
+        closeWebViewTransaction();
+      } catch (error) {
+        console.log(`Erreur: ${error}`);
+      }
+    }
+  };
 
 
   const convertMedia = async (uri, name,cleanedTitle) => {
     try {
       console.log("URI:", uri);
       const extension = uri.split('.').pop();
-      console.log("Extension:", extension);
       let duration = 0;
   
-        console.log("Création du son...");
-        const { sound: newSound } = await Audio.Sound.createAsync({ uri });
-        console.log("Son créé");
-        const { durationMillis } = await newSound.getStatusAsync();
+      const { sound: newSound } = await Audio.Sound.createAsync({ uri });
+      const status = await newSound.getStatusAsync();
+
+      if (status.isLoaded) {
+        const { durationMillis } = status; 
         duration = durationMillis / 1000;
-        console.log("Durée du son:", duration);
-
-      
-      console.log("Obtention des informations du fichier...");
-      const size = await FileSystem.getInfoAsync(uri, { size: true });
-      const date = new Date().toISOString().split('T')[0];
-    
-      console.log("Ouverture de la base de données...");
-      const db = SQLite.openDatabase('files.db');
-
-      const data = {
-        name: name,
-        file_name: cleanedTitle,
-        folder_id: null,
-        date: date,
-        duration: duration,
-        size: size.size,
-        extension: extension
       }
+       
+      const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
 
-      insertFile(data).then((caca) => {
-        console.log("Fichier inséré");
-      }).catch((error) => {
-        console.log("Erreur lors de l'insertion du fichier:", error);
-      });
+      const date = new Date().toISOString().split('T')[0];
+      if (fileInfo.exists && !fileInfo.isDirectory) {
+
+        const data = {
+          name: name,
+          file_name: cleanedTitle,
+          folder_id: currentFolder.id || null,
+          date: date,
+          duration: duration,
+          size: fileInfo.size,
+          extension: extension
+        }
+
+        insertFile(data).then((caca) => {
+          console.log("Fichier inséré");
+        }).catch((error) => {
+          console.log("Erreur lors de l'insertion du fichier:", error);
+        });
+      }else{
+        console.log("Le fichier n'existe pas");
+      }
       
     } catch (error) {
       console.error("Erreur :", error);
     }
   };
-
-
-
-
 
 
 
@@ -75,75 +178,15 @@ export default function WebScreen() {
       console.log('Message ignoré :', data);
       return;
     }
-    setIsMessageProcessing(true);
     console.log('Message reçu :', data);
 
-    // if (data.action == 'play' || data.action == 'load') {
-      Alert.alert('Vidéo détectée', 'Voulez-vous télécharger cette vidéo?', [
-        { text: 'Oui', onPress: () => {
-
-          console.log('Téléchargement en cours...');
-    
-          const cleanFileName = (fileName) => {
-            return fileName.replace(/[^a-zA-Z0-9]/g, '_');
-          }
-
-          const downloadFile = async () => {
-
-            if(uri.includes('soundcloud')){
-              const cleanedTitle = cleanFileName(data.title);
-              const url = `http://192.168.1.34:3000/convert?url=${encodeURIComponent(data.url)}&title=${cleanedTitle}`;
-              const fileUri = `${FileSystem.documentDirectory}${cleanedTitle}.mp3`;
-            
-              const response = await fetch(url);
-              const blob = await response.blob();
-              
-              const reader = new FileReader();
-              reader.onload = async function() {
-                const base64data = reader.result.split(',')[1];
-                await FileSystem.writeAsStringAsync(fileUri, base64data, {
-                  encoding: FileSystem.EncodingType.Base64,
-                });
-                convertMedia(fileUri, data.title, cleanedTitle+'.mp3');
-              };
-              reader.readAsDataURL(blob);
-              console.log(`Fichier téléchargé et sauvegardé à ${fileUri}`);
-              
-              
-              setIsMessageProcessing(false);
-            }
-            else {
-              try {
-                const url = data.url;
-                const cleanedTitle = cleanFileName(data.title);
-                const fileUrl = `${FileSystem.documentDirectory}${cleanedTitle}.mp4`;
-                  
-                const download = FileSystem.createDownloadResumable(url, fileUrl);
-                
-                const { uri: downloadedUrl } = await download.downloadAsync();
-                console.log(`Fichier téléchargé et sauvegardé à ${downloadedUrl}`);
-                
-                convertMedia(downloadedUrl, data.title, cleanedTitle+'.mp4');
-                setIsMessageProcessing(false);
-              } catch (error) {
-                console.log(`Erreur: ${error}`);
-              }
-            }
-          };
-          downloadFile();
-        }    
-      },
-      { text: 'Non', onPress: () => {
-          console.log('Téléchargement annulé.');
-          setIsMessageProcessing(false);
-        } 
-      }
-      ]);
-    // }
+    setIsMessageProcessing(true);
+    setMediaInfos({url: data.url ,title: data.title});
+    setModalVisible(true);
+   
   }, 500); // Attend 500ms avant d'exécuter
 
   const onMessageHandler = (event) => {
-    // console.log('Message reçu :', event.nativeEvent.data);
     debouncedOnMessage(JSON.parse(event.nativeEvent.data));
   };
 
@@ -292,7 +335,7 @@ export default function WebScreen() {
 
 
 
-
+// trouve un moyen pas trop chiant de ranger les 2 scripts dans 2 fichiers différents
 
 
 
@@ -409,9 +452,23 @@ export default function WebScreen() {
   })();
   true; // Retourne true pour indiquer que le script a bien été exécuté
   `;
+  const askUserForNavigationChoice = (url) => {
+    return new Promise((resolve) => {
+      Alert.alert(
+        'Ouvrir le lien',
+        "Voulez-vous ouvrir ce lien dans l'application YouTube ou continuer dans le WebView?",
+        [
+          { text: 'Dans l\'application', onPress: () => resolve('app') },
+          { text: 'Dans WebView', onPress: () => resolve('webView') },
+        ],
+        { cancelable: false }
+      );
+    });
+  };
 
-  const handleNavigationStateChange = (navState) => {
-    const { url } = navState;
+  const handleNavigationStateChange = async (navState) => {
+    let url = navState.url;
+
     if (url !== prevUrl) {
       console.log("La derniere url de requete est :", lastHlsUrl);
       console.log("L'URL actuelle est :", currentUrl);
@@ -420,10 +477,11 @@ export default function WebScreen() {
       currentUrl = '';
       isMusicAlreadyPlayed = false;
       console.log("Réinitialisation de lastHlsUrl il vaut : "+lastHlsUrl);
-      // console.log("url de musique : "+hlsUrls);
       console.log("L'URL actuelle est :", url);
       setPrevUrl(url);
+      
     }
+  
 
     // Réinjecte le JavaScript lorsque la navigation change
     if(uri.includes('soundcloud')){
@@ -431,6 +489,7 @@ export default function WebScreen() {
     }else if(uri.includes('youtube')){
       webViewRef.current?.injectJavaScript(YoutubeJavascript);
     }
+  
   };
 
   const onDebugMessageHandler = (event) => {
@@ -445,20 +504,113 @@ export default function WebScreen() {
         value={textInputValue}
       />
       <Button title="Valider" onPress={handleButtonPress} />
+  
       <WebView
-        ref={webViewRef} // Utilisation de la référence pour le WebView
+        ref={webViewRef}
         source={{ uri }}
         style={{ flex: 5, backgroundColor: 'green' }}
         injectedJavaScript={uri.includes('soundcloud') ? SoundcloudJavascript : (uri.includes('youtube') ? YoutubeJavascript : null)}
         onMessage={onMessageHandler}
-        // onMessage={onDebugMessageHandler}
         onNavigationStateChange={handleNavigationStateChange}
         originWhitelist={['*']}
-        // userAgent="Mozilla/5.0 (Linux; Android 10; SM-A205U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.181 Mobile Safari/537.3"
         userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
-        allowsInlineMediaPlayback={true} // c'est ces 2 lignes qui permettent de lire les vidéos sans le plein écran forcé
+        allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false} 
+        setSupportMultipleWindows={false}
+        startInLoadingState={true}
+       
       />
+
+      {/* PAS BESOIN DE STACK NAVIGATOR TU RELOAD JUSTE AU CLICK */}
+  
+      {modalVisible && (
+        <View style={{
+          position: 'absolute',
+          left: '50%',
+          top: '90%',
+          transform: [{ translateX: -160 }, { translateY: -100 }],
+          backgroundColor: 'darkgray',
+          width: 320,
+          height: 100,
+          zIndex: 9999
+        }}>
+          <Text>Voulez-vous télécharger ce média ?</Text>
+          <Button title="Télécharger" onPress={() => setDirectoryModalVisible(true)} />
+          <Button title="Fermer" onPress={() => {setModalVisible(false); setIsMessageProcessing(false)}} />
+        </View>
+      )}
+      {directoryModalVisible && (
+        <Modal animationType='slide' transparent={true}>
+          <View 
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginTop: 22,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)', // Fond semi-transparent
+            }}
+          >
+            <View 
+              style={{
+                width: windowWidth, // Largeur du contenu du modal
+                height: "100%", // Hauteur du contenu du modal
+                backgroundColor: '#292929', // Couleur de fond du contenu
+                borderRadius: 10, // Bordures arrondies
+                paddingVertical: 20, // Espace interne
+                alignItems: 'center', // Centrer horizontalement le contenu
+                shadowColor: '#000', // Ombre
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 4,
+                elevation: 5
+              }}
+            >
+
+              <View style={{borderBottomWidth:2 , paddingBottom:6, width:"100%"}}>
+                <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20}}>Nom du fichier : </Text>
+                <TextInput value={mediaInfos.title} style={{borderWidth:2, width:300}}/>
+              </View>
+
+
+
+
+
+              <Text style={{fontSize: 20, fontWeight: 'bold', marginBottom: 20}}>Choisissez un dossier</Text>
+              
+              <View style={{width: "100%", height: "60%", backgroundColor:"red",alignItems: 'center',justifyContent: 'flex-start',flexDirection: 'row',flexWrap: 'wrap',padding: 10,}}>
+
+                <View style={{width: "100%", height: "10%", backgroundColor:"blue", flexDirection:"row", alignItems:"center"}}>
+                  <PlayerBtn 
+                      onPress={() => handleBackClick()}
+                      size={30}
+                      svgPaths={["M11.67 3.87L9.9 2.1L0 12l9.9 9.9l1.77-1.77L3.54 12z"]}
+                      style={{ borderRadius: 100, marginLeft: 20 }}
+                      fill='#2F7CF6'
+                  />
+                  <Text>{currentFolder.id ? currentFolder.name : 'Racine'}</Text>
+                </View>
+                {folders.map((item) => {
+                    return (
+                      <React.Fragment key={item.id}>
+                        <FileThumbnail data={item} onSelect={() => handleFolderClick(item.id)} /> 
+                      </React.Fragment>
+                      
+                    );
+                  }               
+                )}
+                
+              </View>
+              
+              <View>
+                <Pressable onPress={() => handleDownload(currentUrl)}><Text>Télécharger ici</Text></Pressable>
+                <Pressable onPress={() => setDirectoryModalVisible(false)}><Text>Fermer</Text></Pressable>
+              </View>
+
+              
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView> 
   );
   

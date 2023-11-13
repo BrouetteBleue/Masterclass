@@ -16,6 +16,7 @@ export const FileExplorerStack = () => {
   return (
     <Stack.Navigator screenOptions={{
           headerShown: false,
+          // presentation: 'modal',
         }}>
       <Stack.Screen
         name="FileExplorer"
@@ -28,7 +29,7 @@ export const FileExplorerStack = () => {
 };
 
 
-const HomeScreen = ({ route, navigation }) => {
+export const HomeScreen = ({ route, navigation }) => {
   const { setCurrentUrl, currentUrl } = useCurrentUrl();
   const { setCurrentTitle, setCanGoBack, setFolderId, canGoBack, folderId } = useNavigationContext();
 
@@ -41,8 +42,8 @@ const HomeScreen = ({ route, navigation }) => {
 
   const handleFilePress = (url) => {
     setCurrentUrl(url);
-    console.log("AAAAAAAAAA"+currentUrl);
-    console.log(url);
+    // console.log("AAAAAAAAAA"+currentUrl);
+    // console.log(url);
   }
 
   useFocusEffect(
@@ -54,9 +55,9 @@ const HomeScreen = ({ route, navigation }) => {
       setCanGoBack(navigation.getState().index > 0); 
       
       fetchFiles(route.params?.folder || null).then((data) => {
-        data.map((item) => {
-          console.log("AAAAAAAAAA"+item.path);
-        })
+        // data.map((item) => {
+        //   console.log("AAAAAAAAAA"+item.path);
+        // })
         setData(data)
       }).catch((err) => {
         console.log(err);
@@ -72,7 +73,7 @@ const HomeScreen = ({ route, navigation }) => {
   // debug function
   const logFiles = async () => {
     try {
-      const dirUri = FileSystem.documentDirectory;
+      const dirUri = FileSystem.documentDirectory+"/Jdndnf";
       const files = await FileSystem.readDirectoryAsync(dirUri);
       console.log('Files in Document Directory:');
       files.forEach((fileName, index) => {
@@ -91,9 +92,12 @@ const HomeScreen = ({ route, navigation }) => {
       const listener = EventRegister.addEventListener('closeMediaPlayer', (data) => {
         setCurrentUrl(null);
       });
+    
       return () => {
-        EventRegister.removeEventListener(listener);
-      }
+        if (typeof listener === 'string') {
+          EventRegister.removeEventListener(listener);
+        }
+      };
     }, []);
 
   const styles = StyleSheet.create({
@@ -115,6 +119,7 @@ const HomeScreen = ({ route, navigation }) => {
           <ScrollView style={{ minHeight: "100%", backgroundColor: '#fff', }}>
             <View style={styles.container} >
               {data.map((item) => {
+                
                 // set composed key to avoid same id warning
                 const key = item.extension ? `file-${item.id}` : `folder-${item.id}`;
                 return (

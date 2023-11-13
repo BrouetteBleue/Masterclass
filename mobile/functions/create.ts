@@ -107,8 +107,8 @@ export interface FileData {
     file_name: string;
     folder_id: number;
     date: string;
-    duration: string;
-    size: string;
+    duration: number;
+    size: number;
     extension: string;
   }
 

@@ -168,14 +168,14 @@ export const BottomTab = () => {
 };
 
 const BackButton = ({ navigation }) => {
-
     return (
-
-        <Pressable onPress={() => navigation.goBack()}>
-          {/* Ici, mettez l'icône ou le texte de votre bouton de retour */}
-            <Text style={{color:"red"}}>Back</Text>
-        </Pressable>
-
+        <PlayerBtn 
+            onPress={() => navigation.goBack()}
+            size={30}
+            svgPaths={["M11.67 3.87L9.9 2.1L0 12l9.9 9.9l1.77-1.77L3.54 12z"]}
+            style={{ borderRadius: 100, marginLeft: 20 }}
+            fill='#2F7CF6'
+        />
     );
   };
  
@@ -185,7 +185,7 @@ const SettingsScreen = () => {
 		<View style={{ flex:1, alignItems: 'center', justifyContent: 'center' }}>
 			<Text> settings </Text>
 		</View>
-	)
+    );
 }
 
 const styles = StyleSheet.create({
