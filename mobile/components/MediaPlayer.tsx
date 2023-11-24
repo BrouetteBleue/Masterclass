@@ -37,13 +37,13 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
     const opacity = useRef(new Animated.Value(1)).current;
     const boxHeight = useRef(new Animated.Value(windowHeight)).current;
     const boxWidth = useRef(new Animated.Value(windowWidth)).current;
-    const panY = useRef(new Animated.Value(90)).current;
+    const panY = useRef(new Animated.Value(0)).current;
     const panX = useRef(new Animated.Value(0)).current;
     const [videoResizeMode, setVideoResizeMode] = useState<ResizeMode>(ResizeMode.COVER);
-    const initialVals = useRef({x: 0, y: 90, height: windowHeight, width: windowWidth});
+    const initialVals = useRef({x: 0, y: 0, height: windowHeight, width: windowWidth});
     const lockedDirection = useRef(null);
     let initialX = 0;
-    let initialY = 90;
+    let initialY = 0;
     let initialHeight: number;
     let initialWidth: number;
     let tapGesture = false;
@@ -69,7 +69,7 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
       let targetY: number = initialY + deltaY;
       let targetX: number = initialX + deltaX;
   
-      targetY = Math.min(Math.max(targetY, 90), 710); // position for iphone 11
+      targetY = Math.min(Math.max(targetY, 0), 710); // position for iphone 11
       targetX = Math.min(Math.max(targetX, 0), 240); 
   
       if (newHeight >= windowHeight) {   
@@ -101,7 +101,7 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
   
         // quand gesture est plus grand que l'ancien = on descend 
         if(oldGestureY.current < gestureY ) {
-          if(initialY === 90) {
+          if(initialY === 0) {
            opacity = 1 - Math.abs(gestureY) / windowWidth;
           }
           else{
@@ -234,7 +234,7 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
           // if the gesture is a tap and the block is at the bottom of the screen, move it to the top
           if (tapGesture && initialY === 710) {  
             // console.log("currentY", currentY, "threshold", threshold , "initialY", initialY, "currentY - initialY", currentY - 100);
-            targetY = 90;
+            targetY = 0;
             targetX = 0;
             targetHeight = windowHeight;
             targetWidth = windowWidth;
@@ -246,7 +246,7 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
           }
   
           // Animation down values
-          if (initialY === 90 && currentY > threshold) {
+          if (initialY === 0 && currentY > threshold) {
             targetY = 710;
             targetX = 240;
             targetHeight = 90;
@@ -255,7 +255,7 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
           // Anivmation up values
           if (!tapGesture && initialY === 710 && currentY < initialY - threshold) {
             //  console.log("currentY", currentY, "initialY", initialY, "gestureState.dy", gestureState.dy, "panY", (panY as any)._value);
-            targetY = 90;
+            targetY = 0;
             targetX = 0;
             targetHeight = windowHeight;
             targetWidth = windowWidth;
@@ -277,7 +277,7 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
             setIsAtBottom(false);
           }
   
-          if (initialY === 90 && currentY > threshold) {
+          if (initialY === 0 && currentY > threshold) {
             Animated.timing(listOpacity, {
               toValue: 0,
               duration: 300,
@@ -322,13 +322,13 @@ export default function  MediaPlayer( {uri, onClose}: MediaPlayerProps) {
       console.log("url", uri);
         if (uri !== null) {
             panX.setValue(0);
-            panY.setValue(90);
+            panY.setValue(0);
             boxHeight.setValue(windowHeight);
             boxWidth.setValue(windowWidth);
             opacity.setValue(1);
             listOpacity.setValue(1);
             isBottom.current = false;
-            initialVals.current = { x: 0, y: 90, height: windowHeight, width: windowWidth };
+            initialVals.current = { x: 0, y: 0, height: windowHeight, width: windowWidth };
             setIsAtBottom(false);
           }
         }, [uri]);

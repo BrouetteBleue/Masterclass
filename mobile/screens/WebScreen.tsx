@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput,Button, Modal, Alert, FlatList, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, Pressable, SafeAreaView, Share,TouchableOpacity, TextInput,Button, Modal, Image, Alert, FlatList, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system';
-import { Linking, NativeModules } from 'react-native';
 import { Video , Audio } from 'expo-av';
-import * as SQLite from 'expo-sqlite';
 import { debounce } from 'lodash';
 import { insertFile } from '../functions/create';
 import { fetchFiles, getFolderInfo } from '../functions/read';
@@ -14,7 +11,7 @@ import PlayerBtn from '../components/Buttons/PlayerBtn';
 
 
 export default function WebScreen() {
-  const [uri, setUri] = useState('https://m.youtube.com/');
+  const [uri, setUri] = useState('');
   const [textInputValue, setTextInputValue] = useState('');
   const webViewRef = useRef(null);
   const [prevUrl, setPrevUrl] = useState('');
@@ -31,8 +28,11 @@ export default function WebScreen() {
   });
   const [folders, setFolders] = useState([]);
   const [mediaInfos, setMediaInfos] = useState({url: '', title: ''});
-  const [pendingUrl, setPendingUrl] = useState(null);
-  const { WebViewBridge } = NativeModules;
+  const [isWebViewVisible, setIsWebViewVisible] = useState(false);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
+  const [windows, setWindows] = useState([{ url: 'https://example.com', active: true }]);
+  const [showWindowsModal, setShowWindowsModal] = useState(false);
 
 
   const loadFolders = async (folderId) => {
@@ -123,6 +123,48 @@ export default function WebScreen() {
     }
   };
 
+  const redirectToWebsite = (url) => {
+    return () => {
+      setIsWebViewVisible(true);
+      setUri(url);
+    };
+  };
+
+  const testDL = async () => {
+    console.log('Téléchargement du média');
+
+    const oui =
+      'https://rr1---sn-n4g-jqbek.googlevideo.com/videoplayback?expire=1700299956&ei=VDBYZYaMNo_YxN8PzNisOA&ip=37.65.165.137&id=o-AMfoDk_8g-Eu2_hlpRXP7plnHurfYkHdKIdY22sZiPJJ&itag=18&source=youtube&requiressl=yes&mh=NP&mm=31%2C26&mn=sn-n4g-jqbek%2Csn-h5q7kne6&ms=au%2Conr&mv=m&mvi=1&pl=19&initcwndbps=1431250&spc=UWF9f0qvhDb_-fKuR8lHPZpEZc86AT5rY6yf_6OGPw&vprv=1&svpuc=1&mime=video%2Fmp4&ns=6tYoIuvuE0jFPvg26I45g2oP&gir=yes&clen=58954440&ratebypass=yes&dur=859.788&lmt=1700096012620757&mt=1700277919&fvip=2&fexp=24007246&beids=24350018&c=MWEB&txp=5538434&n=Iaz1kl5GN1a-F1gPJ&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Cns%2Cgir%2Cclen%2Cratebypass%2Cdur%2Clmt&sig=ANLwegAwRQIgGphUBRvFABzM7-Q0YffBsNHTsN0tHZUdwsvvwlrv16YCIQCAtB1753tDhuuL6kEoucwtdtp4XAVOBSViPUm4K7FyOg%3D%3D&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=AM8Gb2swRAIgAkte0K7_9AzxKtWa_0WUCPSzzpkZ49gpW26HwJs-QW0CICInonI4f--M-J104vP40fQJja-tW_e2wi28NW2V1dpU';
+    // "https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4";
+    const cleanedTitle = 'bangeouai';
+    let directory = FileSystem.documentDirectory;
+    const extension = '.mp4';
+    let fileUri = `${directory}${cleanedTitle}${extension}`;
+
+    try {
+      const downloadResumable = FileSystem.createDownloadResumable(
+        oui,
+        fileUri,
+        {},
+        progress => {
+          const totalBytesWritten = progress.totalBytesWritten;
+          const totalBytesExpectedToWrite = progress.totalBytesExpectedToWrite;
+          console.log(
+            `Progress: ${totalBytesWritten} / ${totalBytesExpectedToWrite}`,
+          );
+        },
+      );
+
+      console.log('Début du téléchargement');
+      const {uri: downloadedUrl} = await downloadResumable.downloadAsync();
+      console.log(`Fichier téléchargé et sauvegardé à ${downloadedUrl}`);
+      convertMedia(downloadedUrl, cleanedTitle, cleanedTitle + '.mp4');
+      // Autres opérations après le téléchargement
+    } catch (error) {
+      console.error(`Erreur lors du téléchargement: ${error}`);
+    }
+  };
+
 
   const convertMedia = async (uri, name,cleanedTitle) => {
     try {
@@ -171,6 +213,8 @@ export default function WebScreen() {
 
   const handleButtonPress = () => {
     setUri("https://www.google.com/search?q="+textInputValue);
+    setIsWebViewVisible(true);
+    
   };
 
   const debouncedOnMessage = debounce((data) => {
@@ -452,6 +496,23 @@ export default function WebScreen() {
   })();
   true; // Retourne true pour indiquer que le script a bien été exécuté
   `;
+
+
+  const clearCookiesScript = `
+  document.cookie.split(";").forEach(function(c) { 
+    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+  });
+`;
+
+
+const removeCookies = () => {
+  setUri("about:blank");
+  webViewRef.current?.injectJavaScript(clearCookiesScript);
+  webViewRef.current?.reload();
+}
+
+
+
   const askUserForNavigationChoice = (url) => {
     return new Promise((resolve) => {
       Alert.alert(
@@ -483,6 +544,8 @@ export default function WebScreen() {
     }
   
 
+    setCanGoBack(navState.canGoBack);
+    setCanGoForward(navState.canGoForward);
     // Réinjecte le JavaScript lorsque la navigation change
     if(uri.includes('soundcloud')){
       webViewRef.current?.injectJavaScript(SoundcloudJavascript);
@@ -496,32 +559,134 @@ export default function WebScreen() {
     console.log("Message du WebView:", event.nativeEvent.data);
   };
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'red' }}>
-      <TextInput
-        style={{ flex: 0.05, backgroundColor: 'green', borderWidth: 1 }}
-        onChangeText={(text) => setTextInputValue(text)}
-        value={textInputValue}
-      />
-      <Button title="Valider" onPress={handleButtonPress} />
-  
-      <WebView
-        ref={webViewRef}
-        source={{ uri }}
-        style={{ flex: 5, backgroundColor: 'green' }}
-        injectedJavaScript={uri.includes('soundcloud') ? SoundcloudJavascript : (uri.includes('youtube') ? YoutubeJavascript : null)}
-        onMessage={onMessageHandler}
-        onNavigationStateChange={handleNavigationStateChange}
-        originWhitelist={['*']}
-        userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
-        allowsInlineMediaPlayback={true}
-        mediaPlaybackRequiresUserAction={false} 
-        setSupportMultipleWindows={false}
-        startInLoadingState={true}
-       
-      />
+  const goBack = () => {
+    webViewRef.current.goBack();
+  };
 
-      {/* PAS BESOIN DE STACK NAVIGATOR TU RELOAD JUSTE AU CLICK */}
+  const goForward = () => {
+    webViewRef.current.goForward();
+  };
+  const share = async () => {
+    try {
+      const result = await Share.share({
+        message: 'Check out this website!',
+        // Vous pouvez aussi partager l'URL actuelle du WebView
+      }); 
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const addWindow = (url) => {
+    setWindows([...windows, { url, active: false }]);
+  };
+
+  const selectWindow = (index) => {
+    const newWindows = windows.map((window, idx) => ({
+      ...window,
+      active: idx === index,
+    }));
+    setWindows(newWindows);
+    setShowWindowsModal(false);
+    webViewRef.current.loadUrl(newWindows[index].url);
+  };
+
+  const renderWindowItem = ({ item, index }) => (
+    <TouchableOpacity style={styles.windowItem} onPress={() => selectWindow(index)}>
+      <Text>{item.url}</Text>
+    </TouchableOpacity>
+  );
+
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }}>
+      <View style={{flexDirection:"row",width:"100%"}}>
+        <TextInput
+          style={{ width:"90%", borderWidth: 1, borderRightWidth:0, borderColor: '#ccc', padding: 10,backgroundColor:"lightgray"}}
+          onChangeText={(text) => setTextInputValue(text)}
+          value={textInputValue}
+        />
+        <PlayerBtn 
+            onPress={() => handleButtonPress()}
+            size={60}
+            svgPaths={["M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5S14 7.01 14 9.5S11.99 14 9.5 14z"]}
+            style={{ borderRadius: 100, zIndex: 99999 }}
+            fill='#2F7CF6'
+        />
+      </View>
+      
+      {isWebViewVisible && (
+        <>
+         <WebView
+            ref={webViewRef}
+            source={{
+              uri: uri,
+              headers: {
+                'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
+              }
+            
+            }}
+            style={{ flex: 5, backgroundColor: 'green' }}
+            injectedJavaScript={uri.includes('soundcloud') ? SoundcloudJavascript : (uri.includes('youtube') ? YoutubeJavascript : null)}
+            onMessage={onMessageHandler}
+            onNavigationStateChange={handleNavigationStateChange}
+            originWhitelist={['*']}
+            userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false} 
+            // setSupportMultipleWindows={false}
+            startInLoadingState={true}
+            // incognito={true}
+            // thirdPartyCookiesEnabled={false}
+            // sharedCookiesEnabled={true}
+          />
+          <View style={{flexDirection: 'row',justifyContent: 'space-around',padding: 10,}}>
+            <Button title="Back" onPress={goBack} disabled={!canGoBack} />
+            <Button title="Forward" onPress={goForward} disabled={!canGoForward} />
+            <Button title="Share" onPress={share} />
+            <Button title="Fenêtres" onPress={() => setShowWindowsModal(true)} />
+            <Button title="RMCookies" onPress={() => removeCookies()} />
+            {/* Ajoutez d'autres boutons pour les bookmarks, l'historique, et voir toutes les fenêtres ici */}
+          </View>
+          <Modal visible={showWindowsModal} onRequestClose={() => setShowWindowsModal(false)}>
+            <FlatList
+              data={windows}
+              renderItem={renderWindowItem}
+              keyExtractor={(item, index) => index.toString()}
+            />
+            <Button title="Ajouter Fenêtre" onPress={() => addWindow('https://example.com')} />
+          </Modal>
+        </>
+       
+      )}
+      
+      {!isWebViewVisible && (
+        <View style={{zIndex: 99999,flexDirection:"row", justifyContent:"flex-start", alignItems:"center", flexWrap:"wrap", padding:10, width:"100%", height:"100%", backgroundColor:"#FB923C" }}>
+        <Pressable onPress={redirectToWebsite("https://m.youtube.com")}>
+          <Image source={require('../assets/youtube.png')} style={{width:100, height:100}}/>
+          <Text>Youtube</Text>
+        </Pressable>
+        <Pressable onPress={redirectToWebsite("https://m.soundcloud.com")}>
+          <Image source={require('../assets/soundcloud.png')} style={{width:100, height:100}}/>
+          <Text>Soundcloud</Text>
+        </Pressable>
+        <Pressable onPress={redirectToWebsite("https://m.x.com")}>
+          <Image source={require('../assets/twitter.png')} style={{width:100, height:100}}/>
+          <Text>Twitter</Text>
+        </Pressable>
+        <Pressable onPress={redirectToWebsite("https://m.tiktok.com")}>
+          <Image source={require('../assets/tiktok.png')} style={{width:100, height:100}}/>
+          <Text>TikTok</Text>
+        </Pressable>
+        <Pressable onPress={() => testDL()}>
+          <Image source={require('../assets/tiktok.png')} style={{width:100, height:100}}/>
+          <Text>TikTok</Text>
+        </Pressable>
+      </View>
+      )}
+ 
+      
+
   
       {modalVisible && (
         <View style={{
@@ -622,5 +787,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  navBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 10,
+  },
+  windowItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
   },
 });

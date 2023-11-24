@@ -64,7 +64,7 @@ let currentUrl = '';
     function getTitleElement() {
       return document.querySelector('[class*="soundTitle__title"] span') || document.querySelector('.PlayableHeader_Title__DndQM'); // la classe du titre change en fonction de la plateforme (web ou mobile)
     }
-    
+     
     // Observer spécifique pour le titre
     const titleObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => { // pour chaque mutation

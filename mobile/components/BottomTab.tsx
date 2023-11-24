@@ -157,7 +157,7 @@ export const BottomTab = () => {
             />
     
             {/* </Tab.Screen> */}
-            <Tab.Screen name="Profile" component={WebScreen} />
+            <Tab.Screen name="Profile" component={WebScreen} options={{ headerShown: false }} />
             <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
         <MenuOverlay visible={menuVisible} onClose={() => setMenuVisible(false)} createFolder={() => setModalVisible(true)} />
