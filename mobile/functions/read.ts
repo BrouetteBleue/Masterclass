@@ -1,65 +1,86 @@
-import * as SQLite from 'expo-sqlite';
+import SQLite from 'react-native-sqlite-storage';
 
-const db = SQLite.openDatabase('files.db');
+const db = SQLite.openDatabase(
+  {
+    name: 'files.db',
+    location: 'default',
+  },
+  () => console.log('Database opened'),
+  error => console.log('Error opening database', error),
+);
 
-export function fetchFiles(folderId: number | null, type: 'all' | 'folders' | 'files' = 'all'): Promise<any> {
+export function fetchFiles(
+  folderId: number | null,
+  type: 'all' | 'folders' | 'files' = 'all',
+): Promise<any[]> {
   return new Promise((resolve, reject) => {
-    let filesQuery;
-    let foldersQuery;
-    let queryParams;
+    let filesQuery = '';
+    let foldersQuery = '';
+    let queryParams: number[] = [];
 
-    // get the files and folders in the specified folder
     if (folderId === null) {
-      filesQuery = "SELECT * FROM files WHERE folder_id IS NULL";
-      foldersQuery = "SELECT * FROM folders WHERE parent_id IS NULL";
+      filesQuery = 'SELECT * FROM files WHERE folder_id IS NULL';
+      foldersQuery = 'SELECT * FROM folders WHERE parent_id IS NULL';
     } else {
-      // get the files and folders in the specified folder
-      filesQuery = "SELECT * FROM files WHERE folder_id = ?";
-      foldersQuery = "SELECT * FROM folders WHERE parent_id = ?";
+      filesQuery = 'SELECT * FROM files WHERE folder_id = ?';
+      foldersQuery = 'SELECT * FROM folders WHERE parent_id = ?';
       queryParams = [folderId];
     }
 
-    db.transaction((tx) => {
-      // fetch folders if needed
+    db.transaction(tx => {
       if (type === 'all' || type === 'folders') {
         // _ = non used param, foldersResult = result of the query
-        tx.executeSql(foldersQuery,queryParams, (_, foldersResult) => {
-          
+        tx.executeSql(
+          foldersQuery,
+          queryParams,
+          (_, foldersResult) => {
+            const foldersArray: any[] = [];
+            for (let i = 0; i < foldersResult.rows.length; i++) {
+              foldersArray.push(foldersResult.rows.item(i));
+            }
+
             if (type === 'folders') {
-              resolve(foldersResult.rows._array);
-              console.log(foldersResult.rows._array);
+              resolve(foldersArray);
             } else {
-                // fetch files
-                tx.executeSql(filesQuery,queryParams,(_, filesResult) => {
-                  // combine the results
-                  const combinedResults = [
-                    ...foldersResult.rows._array,
-                    ...filesResult.rows._array,
-                  ];
+              tx.executeSql(
+                filesQuery,
+                queryParams,
+                (_, filesResult) => {
+                  const filesArray = [];
+                  for (let i = 0; i < filesResult.rows.length; i++) {
+                    filesArray.push(filesResult.rows.item(i));
+                  }
+
+                  const combinedResults = foldersArray.concat(filesArray);              
                   resolve(combinedResults);
-                  // console.log(combinedResults);
                 },
                 (_, error) => {
                   reject(error);
                   return false;
-                });
+                },
+              );
             }
           },
           (_, error) => {
             reject(error);
-            return false; 
-          }
+            return false;
+          },
         );
       } else if (type === 'files') {
-        // fetch only files
-        tx.executeSql(filesQuery,queryParams,(_, filesResult) => {
-            resolve(filesResult.rows._array);
-            console.log(filesResult.rows._array);
+        tx.executeSql(
+          filesQuery,
+          queryParams,
+          (_, filesResult) => {
+            const filesArray = [];
+            for (let i = 0; i < filesResult.rows.length; i++) {
+              filesArray.push(filesResult.rows.item(i));
+            }
+            resolve(filesArray);
           },
           (_, error) => {
             reject(error);
             return false;
-          }
+          },
         );
       }
     });
@@ -68,15 +89,15 @@ export function fetchFiles(folderId: number | null, type: 'all' | 'folders' | 'f
 
 export function getFolderInfo(folderId: number): Promise<any> {
   return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
+    db.transaction(tx => {
       tx.executeSql(
-        "SELECT * FROM folders WHERE id = ?",
+        'SELECT * FROM folders WHERE id = ?',
         [folderId],
-        (_, result) => resolve(result.rows._array[0]),
+        (_, result) => resolve(result.rows.item(0)),
         (_, error) => {
           reject(error);
           return false;
-        }
+        },
       );
     });
   });
